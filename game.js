@@ -361,7 +361,7 @@ const SAVE_KEY = 'rhythm-chef-save';
 function getSaveData() {
     try {
         const raw = localStorage.getItem(SAVE_KEY);
-        if (!raw) return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [], achievements: {}, equippedTitle: null, totalDodges: 0 };
+        if (!raw) return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [], achievements: {}, equippedTitle: null, totalDodges: 0, maxComboEver: 0, levelBestRanks: {} };
         const data = JSON.parse(raw);
         return {
             unlocked: data.unlocked || 1,
@@ -371,10 +371,12 @@ function getSaveData() {
             seenHints: data.seenHints || [],
             achievements: data.achievements || {},
             equippedTitle: data.equippedTitle || null,
-            totalDodges: data.totalDodges || 0
+            totalDodges: data.totalDodges || 0,
+            maxComboEver: data.maxComboEver || 0,
+            levelBestRanks: data.levelBestRanks || {}
         };
     } catch {
-        return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [], achievements: {}, equippedTitle: null, totalDodges: 0 };
+        return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [], achievements: {}, equippedTitle: null, totalDodges: 0, maxComboEver: 0, levelBestRanks: {} };
     }
 }
 
@@ -383,6 +385,32 @@ function saveData(data) {
         localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     } catch (e) {
         console.warn('保存失败', e);
+    }
+}
+
+function updateMaxCombo(combo) {
+    const save = getSaveData();
+    if (combo > (save.maxComboEver || 0)) {
+        save.maxComboEver = combo;
+        saveData(save);
+    }
+}
+
+function updateLevelBestRank(levelId, rank, accuracy, hp) {
+    const save = getSaveData();
+    const prev = save.levelBestRanks[levelId];
+    const rankOrder = { F: 0, C: 1, B: 2, A: 3, S: 4 };
+    const prevRankOrder = prev ? (rankOrder[prev.rank] || 0) : -1;
+    const newRankOrder = rankOrder[rank] || 0;
+    if (!prev || newRankOrder > prevRankOrder ||
+        (newRankOrder === prevRankOrder && accuracy > (prev.accuracy || 0))) {
+        save.levelBestRanks[levelId] = {
+            rank,
+            accuracy: Math.round(accuracy * 10000) / 100,
+            hp: Math.round(hp),
+            updatedAt: Date.now()
+        };
+        saveData(save);
     }
 }
 
@@ -397,6 +425,7 @@ function unlockAchievement(achievementId) {
 }
 
 function checkComboAchievements(combo) {
+    updateMaxCombo(combo);
     const newlyUnlocked = [];
     const latestSave = getSaveData();
     for (const ach of ACHIEVEMENTS) {
@@ -503,6 +532,65 @@ function renderAchievementsPage() {
     updateUnequipButton();
 }
 
+function getAchievementProgressHTML(ach, save) {
+    const condition = ach.condition;
+    let current = 0;
+    let target = 0;
+    let progressHTML = '';
+    let diffText = '';
+
+    if (condition.type === 'combo') {
+        target = condition.value;
+        current = save.maxComboEver || 0;
+        const diff = Math.max(0, target - current);
+        diffText = diff > 0 ? `还差 ${diff} 连击` : '已达成！';
+    } else if (condition.type === 'dodge') {
+        target = condition.value;
+        current = save.totalDodges || 0;
+        const diff = Math.max(0, target - current);
+        diffText = diff > 0 ? `还差 ${diff} 次闪避` : '已达成！';
+    } else if (condition.type === 'srank') {
+        const levelId = condition.level;
+        const best = save.levelBestRanks && save.levelBestRanks[levelId];
+        if (best) {
+            current = best.rank === 'S' ? 100 : Math.floor((best.accuracy / 95) * 100);
+            current = Math.min(current, 99);
+            const accDiff = Math.max(0, 95 - best.accuracy);
+            const hpDiff = Math.max(0, 50 - best.hp);
+            const diffs = [];
+            if (accDiff > 0) diffs.push(`准确率差 ${accDiff.toFixed(1)}%`);
+            if (hpDiff > 0) diffs.push(`生命差 ${hpDiff}`);
+            diffText = diffs.length > 0 ? diffs.join('，') : '已达成S级条件！';
+            if (best.rank === 'S') {
+                current = 100;
+                diffText = '已达成S级！';
+            }
+        } else {
+            current = 0;
+            diffText = '尚未通关此关卡';
+        }
+        target = 100;
+    }
+
+    const percent = Math.min(100, Math.max(0, target > 0 ? Math.floor((current / target) * 100) : current));
+
+    progressHTML = `
+        <div class="achievement-progress-wrap">
+            <div class="achievement-progress-bar">
+                <div class="achievement-progress-fill" style="width: ${percent}%"></div>
+            </div>
+            <div class="achievement-progress-text">
+                <span class="progress-current">${condition.type === 'srank' ? percent + '%' : current}</span>
+                <span class="progress-sep">/</span>
+                <span class="progress-target">${condition.type === 'srank' ? '100%' : target}</span>
+            </div>
+            <div class="achievement-diff">${diffText}</div>
+        </div>
+    `;
+
+    return progressHTML;
+}
+
 function renderAchievementsList() {
     const save = getSaveData();
     const listEl = document.getElementById('achievements-list');
@@ -516,11 +604,13 @@ function renderAchievementsList() {
         const unlocked = !!save.achievements[ach.id];
         const card = document.createElement('div');
         card.className = 'achievement-card ' + (unlocked ? 'unlocked' : 'locked');
+        const progressHTML = unlocked ? '' : getAchievementProgressHTML(ach, save);
         card.innerHTML = `
             <div class="achievement-icon">${unlocked ? ach.icon : '🔒'}</div>
             <div class="achievement-info">
                 <div class="achievement-name">${ach.name}</div>
                 <div class="achievement-desc">${ach.description}</div>
+                ${progressHTML}
             </div>
             <span class="achievement-status ${unlocked ? 'unlocked' : 'locked'}">${unlocked ? '已解锁' : '未解锁'}</span>
         `;
@@ -1094,6 +1184,8 @@ function onLevelComplete(engine) {
 
     // 成就检测（必须先执行，会修改保存数据）
     if (!engine.replayMode) {
+        updateMaxCombo(engine.maxCombo);
+        updateLevelBestRank(level.id, rank, accuracy, engine.hp);
         const sRankUnlocked = checkSRankAchievements(level.id, rank);
         sRankUnlocked.forEach(ach => showAchievementPopup(ach));
         const dodgeUnlocked = checkDodgeAchievements(engine.dodgeCount);
