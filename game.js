@@ -759,6 +759,7 @@ class GameEngine {
 
         this.timelineDuration = 0;
         this.timelineSeekable = false;
+        this.isDraggingTimeline = false;
     }
 
     start(levelId, replayData = null) {
@@ -892,7 +893,7 @@ class GameEngine {
                 const act = this.replayActions[this.currentReplayIndex];
                 this.currentReplayIndex++;
                 if (act.type === 'down') {
-                    this.handleKeyDown(act.lane, now);
+                    this.handleKeyDown(act.lane, act.time);
                 }
             }
         }
@@ -909,7 +910,7 @@ class GameEngine {
         if (this.allNotesPassed(now) && this.activeNotes.length === 0) {
             this.running = false;
             if (this.replayMode) {
-                this.updateTimelinePlayhead(this.duration);
+                this.updateTimelinePlayhead(this.timelineDuration);
             } else {
                 setTimeout(() => onLevelComplete(this), 500);
             }
@@ -1200,16 +1201,23 @@ class GameEngine {
         const judgeContent = document.querySelector('.timeline-judge-content');
         const dodgeContent = document.querySelector('.timeline-dodge-content');
         const track = document.querySelector('.timeline-track');
+        const wrapper = document.getElementById('timeline-content-wrapper');
 
         const minWidth = 800;
         const pixelsPerSecond = 150;
+        const labelWidth = 40;
         const contentWidth = Math.max(minWidth, (duration / 1000) * pixelsPerSecond);
+        const totalWidth = labelWidth + contentWidth;
+
+        if (wrapper) {
+            wrapper.style.width = totalWidth + 'px';
+        }
 
         laneContents.forEach(el => {
-            el.style.minWidth = contentWidth + 'px';
+            el.style.width = contentWidth + 'px';
         });
-        if (judgeContent) judgeContent.style.minWidth = contentWidth + 'px';
-        if (dodgeContent) dodgeContent.style.minWidth = contentWidth + 'px';
+        if (judgeContent) judgeContent.style.width = contentWidth + 'px';
+        if (dodgeContent) dodgeContent.style.width = contentWidth + 'px';
 
         laneContents.forEach(el => el.innerHTML = '');
         if (judgeContent) judgeContent.innerHTML = '';
@@ -1297,11 +1305,15 @@ class GameEngine {
 
         if (!timeline || !track || !thumb || !scrollbar) return;
 
-        const handleSeek = (clientX) => {
+        const getTimeFromScrollPercent = (scrollPercent) => {
+            return Math.max(0, Math.min(1, scrollPercent)) * this.timelineDuration;
+        };
+
+        const handleSeekFromClientX = (clientX) => {
             const laneContent = document.querySelector('.timeline-lane-content[data-lane="0"]');
             if (!laneContent) return;
             const rect = laneContent.getBoundingClientRect();
-            const x = clientX - rect.left;
+            const x = clientX - rect.left + track.scrollLeft;
             const contentWidth = laneContent.scrollWidth;
             const percent = Math.max(0, Math.min(1, x / contentWidth));
             const time = percent * this.timelineDuration;
@@ -1312,15 +1324,17 @@ class GameEngine {
             if (e.target.closest('.timeline-note') || e.target.closest('.timeline-judge') || e.target.closest('.timeline-dodge') || e.target.closest('.timeline-scrollbar')) {
                 return;
             }
-            handleSeek(e.clientX);
+            handleSeekFromClientX(e.clientX);
         });
 
         let isDraggingThumb = false;
         let startX = 0;
         let startScrollLeft = 0;
+        let lastSeekTime = 0;
 
         thumb.addEventListener('mousedown', (e) => {
             isDraggingThumb = true;
+            this.isDraggingTimeline = true;
             startX = e.clientX;
             startScrollLeft = track.scrollLeft;
             e.preventDefault();
@@ -1329,17 +1343,31 @@ class GameEngine {
         document.addEventListener('mousemove', (e) => {
             if (!isDraggingThumb) return;
             const deltaX = e.clientX - startX;
-            const trackWidth = track.clientWidth;
             const contentWidth = track.scrollWidth;
-            const maxScroll = contentWidth - trackWidth;
+            const maxScroll = contentWidth - track.clientWidth;
             const thumbWidth = thumb.offsetWidth;
             const scrollbarWidth = scrollbar.clientWidth;
             const scrollPercent = deltaX / (scrollbarWidth - thumbWidth);
             track.scrollLeft = startScrollLeft + scrollPercent * maxScroll;
+
+            const now = performance.now();
+            if (now - lastSeekTime > 80) {
+                const newScrollPercent = maxScroll > 0 ? track.scrollLeft / maxScroll : 0;
+                this.updateTimelinePlayhead(getTimeFromScrollPercent(newScrollPercent));
+                lastSeekTime = now;
+            }
         });
 
-        document.addEventListener('mouseup', () => {
-            isDraggingThumb = false;
+        document.addEventListener('mouseup', (e) => {
+            if (isDraggingThumb) {
+                isDraggingThumb = false;
+                this.isDraggingTimeline = false;
+                const contentWidth = track.scrollWidth;
+                const maxScroll = contentWidth - track.clientWidth;
+                const scrollPercent = maxScroll > 0 ? track.scrollLeft / maxScroll : 0;
+                const targetTime = getTimeFromScrollPercent(scrollPercent);
+                this.seekTo(targetTime);
+            }
         });
 
         track.addEventListener('scroll', () => {
@@ -1424,30 +1452,47 @@ class GameEngine {
 
     simulateToTime(targetTime) {
         const actions = this.replayActions || [];
-        while (this.currentReplayIndex < actions.length &&
-               actions[this.currentReplayIndex].time <= targetTime) {
-            const act = actions[this.currentReplayIndex];
-            this.currentReplayIndex++;
-            if (act.type === 'down') {
-                this.handleKeyDown(act.lane, act.time);
+        const events = [];
+
+        actions.forEach((act, idx) => {
+            if (act.type === 'down' && act.time <= targetTime) {
+                events.push({ time: act.time, type: 'action', data: act, index: idx });
             }
-        }
+        });
 
         const spawnThreshold = targetTime + NOTE_TRAVEL_TIME;
         while (this.notesData.length > 0 && this.notesData[0].time <= spawnThreshold) {
             const note = this.notesData.shift();
             this.spawnNote(note);
+            if (note.time + JUDGE_WINDOWS.miss <= targetTime) {
+                events.push({
+                    time: note.time + JUDGE_WINDOWS.miss,
+                    type: 'miss',
+                    data: note
+                });
+            }
         }
 
-        for (let i = this.activeNotes.length - 1; i >= 0; i--) {
-            const note = this.activeNotes[i];
-            if (note.removed) continue;
-            const diff = targetTime - note.data.time;
-            if (diff > JUDGE_WINDOWS.miss) {
-                if (note.data.type === 'good') {
-                    this.handleJudge('miss', note, targetTime);
-                } else {
-                    this.handleJudge('bad-dodge', note, targetTime);
+        events.sort((a, b) => {
+            if (a.time !== b.time) return a.time - b.time;
+            return (a.type === 'miss' ? 1 : 0) - (b.type === 'miss' ? 1 : 0);
+        });
+
+        for (const event of events) {
+            if (event.type === 'action') {
+                this.currentReplayIndex = event.index + 1;
+                this.handleKeyDown(event.data.lane, event.time);
+            } else if (event.type === 'miss') {
+                for (let i = this.activeNotes.length - 1; i >= 0; i--) {
+                    const note = this.activeNotes[i];
+                    if (note.removed) continue;
+                    if (note.data._id !== event.data._id) continue;
+                    if (note.data.type === 'good') {
+                        this.handleJudge('miss', note, event.time);
+                    } else {
+                        this.handleJudge('bad-dodge', note, event.time);
+                    }
+                    break;
                 }
             }
         }
@@ -1475,7 +1520,7 @@ class GameEngine {
         const totalSec = (duration / 1000).toFixed(2);
         timeDisplay.textContent = `${currentSec}s / ${totalSec}s`;
 
-        if (this.running && !this.paused) {
+        if (this.running && !this.paused && !this.isDraggingTimeline) {
             const trackRect = track.getBoundingClientRect();
             const playheadRect = playhead.getBoundingClientRect();
             const playheadRelX = playheadRect.left - trackRect.left;

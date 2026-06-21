@@ -1466,7 +1466,6 @@ h2 {
     position: relative;
     overflow-x: auto;
     overflow-y: hidden;
-    scroll-behavior: smooth;
 }
 
 .timeline-track::-webkit-scrollbar {
@@ -1482,12 +1481,18 @@ h2 {
     border-radius: 3px;
 }
 
+.timeline-content-wrapper {
+    position: relative;
+    width: 100%;
+}
+
 .timeline-lane {
     display: flex;
     align-items: center;
     height: 44px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     position: relative;
+    width: 100%;
 }
 
 .timeline-lane:last-child {
@@ -1514,10 +1519,9 @@ h2 {
 .timeline-lane-k .timeline-lane-label { color: #4d96ff; }
 
 .timeline-lane-content {
-    flex: 1;
+    flex: 0 0 auto;
     height: 100%;
     position: relative;
-    min-width: 800px;
 }
 
 .timeline-note {
