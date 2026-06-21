@@ -1457,6 +1457,7 @@ const EventManager = (function () {
             selector: '.order-card:not(.locked)',
             event: 'click',
             handler: (e, target) => {
+                if (e.target.closest('.accept-order-btn')) return;
                 const levelId = parseInt(target.dataset.levelId, 10);
                 if (!isNaN(levelId)) showOrderConfirm(levelId);
             }
