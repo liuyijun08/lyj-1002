@@ -72,6 +72,57 @@ const INITIAL_INVENTORY = 20;
 const BAD_FOOD_PENALTY = 2;
 const MISS_PENALTY = 1;
 
+const CHEF_KEY = 'rhythm-chef-chefs';
+const CHEFS = [
+    { id: 'chef_wang', name: '王大厨', emoji: '👨‍🍳', specialty: '中式炒菜', salary: 200, maxStamina: 100, staminaDecay: 25, desc: '经验丰富，稳扎稳打' },
+    { id: 'chef_li', name: '李师傅', emoji: '👩‍🍳', specialty: '日式料理', salary: 280, maxStamina: 80, staminaDecay: 20, desc: '精致细腻，收费较高' },
+    { id: 'chef_zhang', name: '张小厨', emoji: '🧑‍🍳', specialty: '西式烘焙', salary: 150, maxStamina: 120, staminaDecay: 15, desc: '体力充沛，性价比高' }
+];
+const STAMINA_TIP_PENALTY = 0.5;
+const STAMINA_REST_AMOUNT = 40;
+
+function getChefData() {
+    try {
+        const raw = localStorage.getItem(CHEF_KEY);
+        if (!raw) {
+            const init = {};
+            CHEFS.forEach(c => { init[c.id] = { stamina: c.maxStamina, assigned: false, consecutiveOrders: 0 }; });
+            localStorage.setItem(CHEF_KEY, JSON.stringify(init));
+            return init;
+        }
+        const data = JSON.parse(raw);
+        CHEFS.forEach(c => {
+            if (!data[c.id]) data[c.id] = { stamina: c.maxStamina, assigned: false, consecutiveOrders: 0 };
+        });
+        return data;
+    } catch {
+        const init = {};
+        CHEFS.forEach(c => { init[c.id] = { stamina: c.maxStamina, assigned: false, consecutiveOrders: 0 }; });
+        return init;
+    }
+}
+
+function saveChefData(data) {
+    try {
+        localStorage.setItem(CHEF_KEY, JSON.stringify(data));
+    } catch (e) {
+        console.warn('厨师数据保存失败', e);
+    }
+}
+
+function getAssignedChef() {
+    const data = getChefData();
+    const chefDef = CHEFS.find(c => data[c.id] && data[c.id].assigned);
+    return chefDef ? { def: chefDef, state: data[chefDef.id] } : null;
+}
+
+function getStaminaTipMultiplier(stamina, maxStamina) {
+    const ratio = stamina / maxStamina;
+    if (ratio >= 0.8) return 1.0;
+    if (ratio >= 0.5) return 0.5 + (ratio - 0.5) * (0.5 / 0.3);
+    return ratio * STAMINA_TIP_PENALTY;
+}
+
 // ==================== 关卡定义 ====================
 function generateLevel1() {
     const notes = [];
@@ -538,6 +589,9 @@ function generateCustomerReview(level, stars, passed, endReason, accuracy, badCu
     let tipAmount = 0;
     let commentCategory = 'medium';
     let comment = '';
+    let chefStaminaEffect = null;
+
+    const assignedChef = getAssignedChef();
 
     if (passed) {
         if (stars >= 3) {
@@ -555,7 +609,22 @@ function generateCustomerReview(level, stars, passed, endReason, accuracy, badCu
         }
         if (rating >= 3) {
             const tipRate = TIP_RULES['star' + rating] || 0;
-            tipAmount = Math.floor(level.price * tipRate);
+            let baseTip = Math.floor(level.price * tipRate);
+            if (assignedChef) {
+                const staminaMultiplier = getStaminaTipMultiplier(assignedChef.state.stamina, assignedChef.def.maxStamina);
+                tipAmount = Math.floor(baseTip * staminaMultiplier);
+                chefStaminaEffect = {
+                    chefName: assignedChef.def.name,
+                    chefEmoji: assignedChef.def.emoji,
+                    stamina: assignedChef.state.stamina,
+                    maxStamina: assignedChef.def.maxStamina,
+                    multiplier: staminaMultiplier,
+                    baseTip: baseTip,
+                    finalTip: tipAmount
+                };
+            } else {
+                tipAmount = baseTip;
+            }
         }
     } else {
         rating = 1;
@@ -591,7 +660,8 @@ function generateCustomerReview(level, stars, passed, endReason, accuracy, badCu
         badCuts: badCuts,
         passed: passed,
         endReason: endReason,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        chefStaminaEffect: chefStaminaEffect
     };
 
     return review;
@@ -1209,7 +1279,163 @@ function showScreen(id) {
     if (id === 'achievements') renderAchievementsPage();
     if (id === 'inventory') renderInventoryPage();
     if (id === 'review-wall') renderReviewWall();
+    if (id === 'chef-schedule') renderChefSchedule();
     if (id === 'menu') updateMenuTitle();
+}
+
+// ==================== 厨师排班系统 ====================
+function renderChefSchedule() {
+    const chefData = getChefData();
+    const container = document.getElementById('chef-cards');
+    if (!container) return;
+    container.innerHTML = '';
+
+    CHEFS.forEach(chef => {
+        const state = chefData[chef.id];
+        const staminaRatio = state.stamina / chef.maxStamina;
+        const staminaClass = staminaRatio >= 0.6 ? 'high' : staminaRatio >= 0.3 ? 'mid' : 'low';
+        const staminaValueClass = staminaRatio >= 0.6 ? 'stamina-high' : staminaRatio >= 0.3 ? 'stamina-mid' : 'stamina-low';
+        const tipMultiplier = getStaminaTipMultiplier(state.stamina, chef.maxStamina);
+        const tipPercent = Math.round(tipMultiplier * 100);
+
+        const card = document.createElement('div');
+        card.className = 'chef-card' + (state.assigned ? ' assigned' : '') + (staminaRatio < 0.3 ? ' exhausted' : '');
+
+        card.innerHTML = `
+            <div class="chef-card-top">
+                <div class="chef-card-emoji">${chef.emoji}</div>
+                <div class="chef-card-info">
+                    <div class="chef-card-name">${chef.name}</div>
+                    <div class="chef-card-specialty">🎯 ${chef.specialty}</div>
+                    <div class="chef-card-desc">${chef.desc}</div>
+                </div>
+                <span class="chef-card-badge ${state.assigned ? 'on-duty' : 'off-duty'}">${state.assigned ? '值班中' : '休息'}</span>
+            </div>
+            <div class="chef-stamina-bar">
+                <div class="chef-stamina-fill ${staminaClass}" style="width:${Math.max(2, staminaRatio * 100)}%"></div>
+            </div>
+            <div class="chef-card-stats">
+                <div class="chef-stat">
+                    <span class="chef-stat-icon">💪</span>
+                    <span class="chef-stat-label">体力</span>
+                    <span class="chef-stat-value ${staminaValueClass}">${state.stamina}/${chef.maxStamina}</span>
+                </div>
+                <div class="chef-stat">
+                    <span class="chef-stat-icon">🎯</span>
+                    <span class="chef-stat-label">专长</span>
+                    <span class="chef-stat-value" style="font-size:12px;">${chef.specialty}</span>
+                </div>
+                <div class="chef-stat">
+                    <span class="chef-stat-icon">💰</span>
+                    <span class="chef-stat-label">工资</span>
+                    <span class="chef-stat-value" style="color:var(--perfect);">¥${chef.salary}</span>
+                </div>
+            </div>
+            ${state.consecutiveOrders > 0 ? `<div class="chef-card-consecutive">📦 连续接单：${state.consecutiveOrders} 单 · 每单体力 -${chef.staminaDecay}</div>` : ''}
+            <div class="chef-card-tip-preview">
+                💰 当前小费系数：<span class="${tipMultiplier >= 1 ? 'tip-bonus' : tipMultiplier >= 0.5 ? '' : 'tip-penalty'}">${tipPercent}%</span>
+                ${tipMultiplier < 1 ? '<span class="tip-penalty"> (体力不足，小费下降)</span>' : ''}
+            </div>
+            <div class="chef-card-actions">
+                <button class="btn ${state.assigned ? 'btn-secondary' : 'btn-success'} chef-assign-btn" data-chef-id="${chef.id}">
+                    ${state.assigned ? '取消值班' : '安排值班'}
+                </button>
+                <button class="btn btn-secondary chef-rest-btn" data-chef-id="${chef.id}">
+                    😴 休息
+                </button>
+            </div>
+        `;
+
+        container.appendChild(card);
+    });
+
+    container.querySelectorAll('.chef-assign-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const chefId = btn.dataset.chefId;
+            toggleChefAssignment(chefId);
+        });
+    });
+
+    container.querySelectorAll('.chef-rest-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const chefId = btn.dataset.chefId;
+            restChef(chefId);
+        });
+    });
+}
+
+function toggleChefAssignment(chefId) {
+    const data = getChefData();
+    const state = data[chefId];
+    if (!state) return;
+
+    if (state.assigned) {
+        state.assigned = false;
+        state.consecutiveOrders = 0;
+        saveChefData(data);
+        const chef = CHEFS.find(c => c.id === chefId);
+        showToast(`${chef.emoji} ${chef.name} 已取消值班`);
+    } else {
+        if (state.stamina <= 0) {
+            showToast('❌ 厨师体力耗尽，请先休息恢复！');
+            return;
+        }
+        Object.keys(data).forEach(id => { data[id].assigned = false; });
+        state.assigned = true;
+        state.consecutiveOrders = 0;
+        saveChefData(data);
+        const chef = CHEFS.find(c => c.id === chefId);
+        showToast(`✅ ${chef.emoji} ${chef.name} 开始值班！`);
+    }
+    renderChefSchedule();
+}
+
+function restChef(chefId) {
+    const data = getChefData();
+    const state = data[chefId];
+    const chef = CHEFS.find(c => c.id === chefId);
+    if (!state || !chef) return;
+
+    const before = state.stamina;
+    state.stamina = Math.min(chef.maxStamina, state.stamina + STAMINA_REST_AMOUNT);
+    if (state.stamina >= chef.maxStamina) {
+        state.consecutiveOrders = 0;
+    }
+    if (state.assigned && state.stamina <= 0) {
+        state.assigned = false;
+    }
+    saveChefData(data);
+    const healed = state.stamina - before;
+    showToast(`😴 ${chef.name} 休息恢复了 ${healed} 体力（${state.stamina}/${chef.maxStamina}）`);
+    renderChefSchedule();
+}
+
+function restAllChefs() {
+    const data = getChefData();
+    CHEFS.forEach(chef => {
+        const state = data[chef.id];
+        const before = state.stamina;
+        state.stamina = Math.min(chef.maxStamina, state.stamina + STAMINA_REST_AMOUNT);
+        if (state.stamina >= chef.maxStamina) {
+            state.consecutiveOrders = 0;
+        }
+    });
+    saveChefData(data);
+    showToast('😴 全员休息！每位厨师恢复了体力');
+    renderChefSchedule();
+}
+
+function applyChefStaminaDecay() {
+    const chef = getAssignedChef();
+    if (!chef) return;
+    const data = getChefData();
+    const state = data[chef.def.id];
+    state.stamina = Math.max(0, state.stamina - chef.def.staminaDecay);
+    state.consecutiveOrders = (state.consecutiveOrders || 0) + 1;
+    if (state.stamina <= 0) {
+        state.assigned = false;
+    }
+    saveChefData(data);
 }
 
 // ==================== 关卡选择（餐厅订单模式）====================
@@ -1320,6 +1546,18 @@ function showOrderConfirm(levelId) {
     diffEl.className = 'confirm-difficulty diff-' + lvl.difficulty;
 
     renderLevelIngredientsCheck(levelId);
+
+    const chefSection = document.getElementById('confirm-chef-section');
+    const chefInfo = document.getElementById('confirm-chef-info');
+    const assignedChef = getAssignedChef();
+    if (assignedChef && chefSection && chefInfo) {
+        chefSection.style.display = '';
+        const tipMul = getStaminaTipMultiplier(assignedChef.state.stamina, assignedChef.def.maxStamina);
+        const tipPercent = Math.round(tipMul * 100);
+        chefInfo.innerHTML = `${assignedChef.def.emoji} <strong>${assignedChef.def.name}</strong> · 🎯${assignedChef.def.specialty} · 💪体力 ${assignedChef.state.stamina}/${assignedChef.def.maxStamina} · 💰小费系数 <span style="color:${tipMul >= 1 ? 'var(--success)' : 'var(--accent)'}">${tipPercent}%</span>`;
+    } else if (chefSection) {
+        chefSection.style.display = 'none';
+    }
 
     document.getElementById('order-confirm').style.display = 'flex';
 }
@@ -2311,7 +2549,24 @@ function startLevel(levelId) {
     }
     game = new GameEngine(false);
     showScreen('game');
+    updateGameHUDChef();
     game.start(levelId);
+}
+
+function updateGameHUDChef() {
+    const chefInfoEl = document.getElementById('hud-chef-info');
+    const chefEmojiEl = document.getElementById('hud-chef-emoji');
+    const chefStaminaEl = document.getElementById('hud-chef-stamina');
+    const assignedChef = getAssignedChef();
+    if (assignedChef && chefInfoEl && chefEmojiEl && chefStaminaEl) {
+        chefInfoEl.style.display = '';
+        chefEmojiEl.textContent = assignedChef.def.emoji;
+        const ratio = assignedChef.state.stamina / assignedChef.def.maxStamina;
+        chefStaminaEl.textContent = assignedChef.state.stamina + '/' + assignedChef.def.maxStamina;
+        chefStaminaEl.className = 'hud-chef-stamina ' + (ratio >= 0.6 ? 'high' : ratio >= 0.3 ? 'mid' : 'low');
+    } else if (chefInfoEl) {
+        chefInfoEl.style.display = 'none';
+    }
 }
 
 // ==================== 关卡完成 ====================
@@ -2380,6 +2635,9 @@ function onLevelComplete(engine) {
         if (currentReview.tip > 0) {
             save.totalTips = (save.totalTips || 0) + currentReview.tip;
             save.totalIncome = (save.totalIncome || 0) + currentReview.tip;
+        }
+        if (passed) {
+            applyChefStaminaDecay();
         }
     }
 
@@ -2514,6 +2772,26 @@ function showCustomerReviewOnResult(review) {
     const commentEl = document.getElementById('cr-comment');
     if (commentEl) {
         commentEl.textContent = review.comment;
+    }
+
+    let chefRow = document.getElementById('cr-chef-row');
+    if (review.chefStaminaEffect) {
+        const effect = review.chefStaminaEffect;
+        if (!chefRow) {
+            chefRow = document.createElement('div');
+            chefRow.id = 'cr-chef-row';
+            chefRow.className = 'cr-chef-row';
+            const tipRow = document.getElementById('cr-tip-row');
+            if (tipRow && tipRow.parentNode) {
+                tipRow.parentNode.insertBefore(chefRow, tipRow.nextSibling);
+            }
+        }
+        const mulPercent = Math.round(effect.multiplier * 100);
+        const isPenalty = effect.multiplier < 1;
+        chefRow.innerHTML = `<span class="cr-chef-label">${effect.chefEmoji} ${effect.chefName} 体力影响：</span><span class="cr-chef-stamina-effect ${isPenalty ? 'negative' : 'positive'}">${isPenalty ? '↓' : '→'} 小费 ×${(effect.multiplier).toFixed(2)}（${mulPercent}%）</span>`;
+        chefRow.style.display = '';
+    } else if (chefRow) {
+        chefRow.style.display = 'none';
     }
 }
 
@@ -2741,6 +3019,14 @@ function init() {
     document.getElementById('btn-inventory').addEventListener('click', () => {
         showScreen('inventory');
     });
+    document.getElementById('btn-chef-schedule').addEventListener('click', () => {
+        showScreen('chef-schedule');
+    });
+
+    const btnRestChef = document.getElementById('btn-rest-chef');
+    if (btnRestChef) {
+        btnRestChef.addEventListener('click', restAllChefs);
+    }
 
     const btnReviewWall = document.getElementById('btn-review-wall');
     if (btnReviewWall) {

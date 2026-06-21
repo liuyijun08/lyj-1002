@@ -16,9 +16,23 @@
         </div>
         <div class="menu-buttons">
             <button id="btn-start" class="btn btn-primary">开始游戏</button>
+            <button id="btn-chef-schedule" class="btn btn-secondary">👨‍🍳 厨师排班</button>
             <button id="btn-inventory" class="btn btn-secondary">📦 食材库存</button>
             <button id="btn-achievements" class="btn btn-secondary">🏆 成就墙</button>
             <button id="btn-howto" class="btn btn-secondary">操作说明</button>
+        </div>
+    </div>
+
+    <div id="chef-schedule" class="screen">
+        <div class="chef-schedule-header">
+            <div class="chef-schedule-logo">👨‍🍳</div>
+            <h2 class="chef-schedule-title">厨师排班表</h2>
+            <p class="chef-schedule-desc">安排厨师值班，连续接单会消耗体力影响小费</p>
+        </div>
+        <div id="chef-cards" class="chef-cards"></div>
+        <div class="chef-schedule-actions">
+            <button id="btn-rest-chef" class="btn btn-success">😴 全员休息</button>
+            <button class="btn btn-secondary" onclick="showScreen('menu')">返回主菜单</button>
         </div>
     </div>
 
@@ -254,6 +268,10 @@
                     <div class="confirm-ingredients-title">🥗 所需食材</div>
                     <div id="confirm-ingredients-list" class="confirm-ingredients-list"></div>
                 </div>
+                <div id="confirm-chef-section" style="display:none;">
+                    <div class="confirm-ingredients-title">👨‍🍳 值班厨师</div>
+                    <div id="confirm-chef-info" style="font-size:14px;padding:8px 12px;background:rgba(0,214,143,0.08);border-radius:8px;"></div>
+                </div>
             </div>
             <div class="confirm-difficulty-row">
                 <span class="confirm-diff-label">难度：</span>
@@ -284,6 +302,10 @@
                 <div class="hud-item">
                     <span class="hud-label">🏆 最大连击</span>
                     <span id="max-combo" class="hud-value">0</span>
+                </div>
+                <div class="hud-item hud-chef" id="hud-chef-info" style="display:none;">
+                    <span class="hud-chef-emoji" id="hud-chef-emoji"></span>
+                    <span class="hud-chef-stamina" id="hud-chef-stamina"></span>
                 </div>
             </div>
             <div class="hud-center">
