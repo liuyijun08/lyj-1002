@@ -33,6 +33,45 @@ const NOTE_TRAVEL_TIME = 2000; // ms, 音符从顶落到底的时间
 const FOOD_EMOJIS_GOOD = ['🥬', '🥕', '🥔', '🍅', '🥒', '🌽', '🧅', '🥦', '🥩', '🍗', '🐟', '🍤', '🍳', '🧀', '🥚', '🌶️'];
 const FOOD_EMOJIS_BAD = ['🦠', '💀', '🪳', '☣️', '🧟'];
 
+const INGREDIENTS = {
+    cabbage: { id: 'cabbage', name: '白菜', emoji: '🥬', category: 'vegetable', price: 5, unit: '份', lowStock: 10 },
+    carrot: { id: 'carrot', name: '胡萝卜', emoji: '🥕', category: 'vegetable', price: 4, unit: '根', lowStock: 15 },
+    potato: { id: 'potato', name: '土豆', emoji: '🥔', category: 'vegetable', price: 3, unit: '个', lowStock: 20 },
+    tomato: { id: 'tomato', name: '番茄', emoji: '🍅', category: 'vegetable', price: 6, unit: '个', lowStock: 15 },
+    cucumber: { id: 'cucumber', name: '黄瓜', emoji: '🥒', category: 'vegetable', price: 4, unit: '根', lowStock: 12 },
+    corn: { id: 'corn', name: '玉米', emoji: '🌽', category: 'vegetable', price: 5, unit: '根', lowStock: 10 },
+    onion: { id: 'onion', name: '洋葱', emoji: '🧅', category: 'vegetable', price: 3, unit: '个', lowStock: 18 },
+    broccoli: { id: 'broccoli', name: '西兰花', emoji: '🥦', category: 'vegetable', price: 7, unit: '颗', lowStock: 8 },
+    chili: { id: 'chili', name: '辣椒', emoji: '🌶️', category: 'vegetable', price: 2, unit: '个', lowStock: 25 },
+    beef: { id: 'beef', name: '牛肉', emoji: '🥩', category: 'meat', price: 25, unit: '块', lowStock: 6 },
+    chicken: { id: 'chicken', name: '鸡肉', emoji: '🍗', category: 'meat', price: 18, unit: '块', lowStock: 8 },
+    fish: { id: 'fish', name: '鲜鱼', emoji: '🐟', category: 'fish', price: 30, unit: '条', lowStock: 5 },
+    shrimp: { id: 'shrimp', name: '鲜虾', emoji: '🍤', category: 'fish', price: 35, unit: '只', lowStock: 6 },
+    egg: { id: 'egg', name: '鸡蛋', emoji: '🥚', category: 'other', price: 2, unit: '个', lowStock: 30 },
+    cheese: { id: 'cheese', name: '奶酪', emoji: '🧀', category: 'other', price: 12, unit: '块', lowStock: 8 },
+    eggpan: { id: 'eggpan', name: '煎蛋', emoji: '🍳', category: 'other', price: 5, unit: '份', lowStock: 15 }
+};
+
+const LEVEL_INGREDIENTS = {
+    1: { cabbage: 5, tomato: 3, cucumber: 2, carrot: 2 },
+    2: { tomato: 4, egg: 4, onion: 2, chili: 3 },
+    3: { beef: 4, potato: 3, onion: 2, carrot: 3 },
+    4: { fish: 3, shrimp: 4, egg: 3, corn: 2 },
+    5: { beef: 3, fish: 2, shrimp: 3, broccoli: 3, egg: 4, carrot: 2 }
+};
+
+const EMOJI_TO_INGREDIENT = {
+    '🥬': 'cabbage', '🥕': 'carrot', '🥔': 'potato', '🍅': 'tomato',
+    '🥒': 'cucumber', '🌽': 'corn', '🧅': 'onion', '🥦': 'broccoli',
+    '🥩': 'beef', '🍗': 'chicken', '🐟': 'fish', '🍤': 'shrimp',
+    '🍳': 'eggpan', '🧀': 'cheese', '🥚': 'egg', '🌶️': 'chili'
+};
+
+const INVENTORY_KEY = 'rhythm-chef-inventory';
+const INITIAL_INVENTORY = 20;
+const BAD_FOOD_PENALTY = 2;
+const MISS_PENALTY = 1;
+
 // ==================== 关卡定义 ====================
 function generateLevel1() {
     const notes = [];
@@ -447,6 +486,308 @@ function saveData(data) {
     }
 }
 
+// ==================== 库存管理系统 ====================
+function getInventoryData() {
+    try {
+        const raw = localStorage.getItem(INVENTORY_KEY);
+        if (!raw) {
+            const initialInv = {};
+            Object.keys(INGREDIENTS).forEach(id => {
+                initialInv[id] = INITIAL_INVENTORY;
+            });
+            localStorage.setItem(INVENTORY_KEY, JSON.stringify(initialInv));
+            return initialInv;
+        }
+        const data = JSON.parse(raw);
+        Object.keys(INGREDIENTS).forEach(id => {
+            if (data[id] === undefined) data[id] = INITIAL_INVENTORY;
+        });
+        return data;
+    } catch {
+        const initialInv = {};
+        Object.keys(INGREDIENTS).forEach(id => {
+            initialInv[id] = INITIAL_INVENTORY;
+        });
+        return initialInv;
+    }
+}
+
+function saveInventoryData(data) {
+    try {
+        localStorage.setItem(INVENTORY_KEY, JSON.stringify(data));
+    } catch (e) {
+        console.warn('库存保存失败', e);
+    }
+}
+
+function getInventoryStock(ingredientId) {
+    const inv = getInventoryData();
+    return inv[ingredientId] || 0;
+}
+
+function updateInventory(ingredientId, delta) {
+    const inv = getInventoryData();
+    inv[ingredientId] = Math.max(0, (inv[ingredientId] || 0) + delta);
+    saveInventoryData(inv);
+    return inv[ingredientId];
+}
+
+function batchUpdateInventory(changes) {
+    const inv = getInventoryData();
+    Object.keys(changes).forEach(id => {
+        inv[id] = Math.max(0, (inv[id] || 0) + changes[id]);
+    });
+    saveInventoryData(inv);
+    return inv;
+}
+
+function checkInventoryForLevel(levelId) {
+    const required = LEVEL_INGREDIENTS[levelId];
+    if (!required) return { sufficient: true, missing: [] };
+    const inv = getInventoryData();
+    const missing = [];
+    let sufficient = true;
+    Object.keys(required).forEach(id => {
+        const needed = required[id];
+        const have = inv[id] || 0;
+        if (have < needed) {
+            sufficient = false;
+            missing.push({
+                id,
+                ingredient: INGREDIENTS[id],
+                needed,
+                have,
+                shortage: needed - have
+            });
+        }
+    });
+    return { sufficient, missing };
+}
+
+function consumeLevelIngredients(levelId) {
+    const required = LEVEL_INGREDIENTS[levelId];
+    if (!required) return;
+    const changes = {};
+    Object.keys(required).forEach(id => {
+        changes[id] = -required[id];
+    });
+    batchUpdateInventory(changes);
+}
+
+function restockIngredient(ingredientId, quantity) {
+    const save = getSaveData();
+    const ingredient = INGREDIENTS[ingredientId];
+    const totalCost = ingredient.price * quantity;
+    const currentBalance = save.totalIncome || 0;
+    if (currentBalance < totalCost) {
+        return { success: false, reason: '余额不足' };
+    }
+    updateInventory(ingredientId, quantity);
+    save.totalIncome = currentBalance - totalCost;
+    saveData(save);
+    return { success: true, newStock: getInventoryStock(ingredientId), newBalance: save.totalIncome };
+}
+
+function restockAll(quantity = 20) {
+    const save = getSaveData();
+    const inv = getInventoryData();
+    let totalCost = 0;
+    const toRestock = [];
+    Object.keys(INGREDIENTS).forEach(id => {
+        const current = inv[id] || 0;
+        const needed = Math.max(0, quantity - current);
+        if (needed > 0) {
+            toRestock.push({ id, needed, cost: needed * INGREDIENTS[id].price });
+            totalCost += needed * INGREDIENTS[id].price;
+        }
+    });
+    const currentBalance = save.totalIncome || 0;
+    if (currentBalance < totalCost) {
+        return { success: false, reason: '余额不足', totalCost, currentBalance };
+    }
+    toRestock.forEach(item => {
+        updateInventory(item.id, item.needed);
+    });
+    save.totalIncome = currentBalance - totalCost;
+    saveData(save);
+    return { success: true, restocked: toRestock, totalCost, newBalance: save.totalIncome };
+}
+
+function getInventoryTotalValue() {
+    const inv = getInventoryData();
+    let total = 0;
+    Object.keys(inv).forEach(id => {
+        if (INGREDIENTS[id]) {
+            total += inv[id] * INGREDIENTS[id].price;
+        }
+    });
+    return total;
+}
+
+function getLowStockCount() {
+    const inv = getInventoryData();
+    let count = 0;
+    Object.keys(inv).forEach(id => {
+        if (INGREDIENTS[id] && inv[id] <= INGREDIENTS[id].lowStock) {
+            count++;
+        }
+    });
+    return count;
+}
+
+let currentInvCategory = 'all';
+let pendingRestockIngredientId = null;
+let pendingRestockQuantity = 10;
+
+function renderInventoryPage() {
+    const save = getSaveData();
+    const inv = getInventoryData();
+    document.getElementById('inv-total-value').textContent = '¥' + getInventoryTotalValue().toLocaleString();
+    document.getElementById('inv-total-types').textContent = Object.keys(INGREDIENTS).length;
+    document.getElementById('inv-low-alert').textContent = getLowStockCount();
+    renderInventoryList();
+}
+
+function renderInventoryList() {
+    const inv = getInventoryData();
+    const listEl = document.getElementById('inventory-list');
+    listEl.innerHTML = '';
+    const ingredientList = Object.values(INGREDIENTS);
+    const filtered = currentInvCategory === 'all'
+        ? ingredientList
+        : ingredientList.filter(i => i.category === currentInvCategory);
+    filtered.forEach(ing => {
+        const stock = inv[ing.id] || 0;
+        const isLow = stock <= ing.lowStock;
+        const card = document.createElement('div');
+        card.className = 'inventory-card' + (isLow ? ' low-stock' : '');
+        card.innerHTML = `
+            <div class="inv-card-icon">${ing.emoji}</div>
+            <div class="inv-card-info">
+                <div class="inv-card-name">${ing.name}</div>
+                <div class="inv-card-category">${getCategoryLabel(ing.category)}</div>
+            </div>
+            <div class="inv-card-stock">
+                <div class="inv-stock-bar">
+                    <div class="inv-stock-fill ${isLow ? 'low' : ''}" style="width: ${Math.min(100, stock / 50 * 100)}%"></div>
+                </div>
+                <div class="inv-stock-text ${isLow ? 'low' : ''}">${stock} ${ing.unit}</div>
+            </div>
+            <div class="inv-card-price">¥${ing.price}/${ing.unit}</div>
+            <button class="btn btn-small btn-restock" data-id="${ing.id}">补货</button>
+        `;
+        card.querySelector('.btn-restock').addEventListener('click', (e) => {
+            e.stopPropagation();
+            showRestockDialog(ing.id);
+        });
+        listEl.appendChild(card);
+    });
+}
+
+function getCategoryLabel(category) {
+    const labels = { vegetable: '🥬 蔬菜', meat: '🥩 肉类', fish: '🐟 水产', other: '🥚 其他' };
+    return labels[category] || category;
+}
+
+function showRestockDialog(ingredientId) {
+    const ing = INGREDIENTS[ingredientId];
+    if (!ing) return;
+    pendingRestockIngredientId = ingredientId;
+    pendingRestockQuantity = 10;
+    document.getElementById('restock-icon').textContent = ing.emoji;
+    document.getElementById('restock-title').textContent = '补货：' + ing.name;
+    document.getElementById('restock-item-name').textContent = `${ing.emoji} ${ing.name} （${ing.unit}）`;
+    document.getElementById('restock-unit-price').textContent = '¥' + ing.price;
+    document.getElementById('restock-quantity').value = pendingRestockQuantity;
+    updateRestockTotal();
+    const save = getSaveData();
+    document.getElementById('restock-balance').textContent = '¥' + (save.totalIncome || 0).toLocaleString();
+    document.getElementById('restock-dialog').style.display = 'flex';
+}
+
+function updateRestockTotal() {
+    if (!pendingRestockIngredientId) return;
+    const ing = INGREDIENTS[pendingRestockIngredientId];
+    const total = ing.price * pendingRestockQuantity;
+    document.getElementById('restock-total-price').textContent = '¥' + total.toLocaleString();
+}
+
+function dismissRestockDialog() {
+    document.getElementById('restock-dialog').style.display = 'none';
+    pendingRestockIngredientId = null;
+}
+
+function confirmRestock() {
+    if (!pendingRestockIngredientId) return;
+    const result = restockIngredient(pendingRestockIngredientId, pendingRestockQuantity);
+    if (result.success) {
+        dismissRestockDialog();
+        renderInventoryPage();
+        showToast(`✅ 补货成功！当前库存：${result.newStock}`);
+    } else {
+        showToast('❌ ' + result.reason);
+    }
+}
+
+function showToast(message) {
+    let toast = document.getElementById('inventory-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'inventory-toast';
+        toast.className = 'inventory-toast';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+function renderLevelIngredientsCheck(levelId) {
+    const required = LEVEL_INGREDIENTS[levelId];
+    const inv = getInventoryData();
+    const listEl = document.getElementById('confirm-ingredients-list');
+    const warningEl = document.getElementById('inventory-warning');
+    const warningTextEl = document.getElementById('inventory-warning-text');
+    const acceptBtn = document.getElementById('btn-accept-order');
+    listEl.innerHTML = '';
+    if (!required) {
+        listEl.innerHTML = '<div class="no-ingredients">无特殊食材需求</div>';
+        warningEl.style.display = 'none';
+        acceptBtn.disabled = false;
+        acceptBtn.classList.remove('disabled');
+        return;
+    }
+    const checkResult = checkInventoryForLevel(levelId);
+    let html = '';
+    Object.keys(required).forEach(id => {
+        const ing = INGREDIENTS[id];
+        const needed = required[id];
+        const have = inv[id] || 0;
+        const sufficient = have >= needed;
+        html += `
+            <div class="ingredient-item ${sufficient ? '' : 'insufficient'}">
+                <span class="ing-emoji">${ing.emoji}</span>
+                <span class="ing-name">${ing.name}</span>
+                <span class="ing-need">×${needed}</span>
+                <span class="ing-have ${sufficient ? 'ok' : 'low'}">（库存：${have}）</span>
+                ${sufficient ? '<span class="ing-status ok">✓</span>' : '<span class="ing-status bad">✗</span>'}
+            </div>
+        `;
+    });
+    listEl.innerHTML = html;
+    if (!checkResult.sufficient) {
+        const missingNames = checkResult.missing.map(m => `${m.ingredient.emoji}${m.ingredient.name}缺${m.shortage}${m.ingredient.unit}`).join('，');
+        warningTextEl.textContent = `库存不足！${missingNames}`;
+        warningEl.style.display = 'flex';
+        acceptBtn.disabled = true;
+        acceptBtn.classList.add('disabled');
+    } else {
+        warningEl.style.display = 'none';
+        acceptBtn.disabled = false;
+        acceptBtn.classList.remove('disabled');
+    }
+}
+
 function updateMaxCombo(combo) {
     const save = getSaveData();
     if (combo > (save.maxComboEver || 0)) {
@@ -747,6 +1088,7 @@ function showScreen(id) {
     document.getElementById(id).classList.add('active');
     if (id === 'level-select') renderLevelSelect();
     if (id === 'achievements') renderAchievementsPage();
+    if (id === 'inventory') renderInventoryPage();
     if (id === 'menu') updateMenuTitle();
 }
 
@@ -857,6 +1199,8 @@ function showOrderConfirm(levelId) {
     diffEl.textContent = lvl.difficultyLabel;
     diffEl.className = 'confirm-difficulty diff-' + lvl.difficulty;
 
+    renderLevelIngredientsCheck(levelId);
+
     document.getElementById('order-confirm').style.display = 'flex';
 }
 
@@ -867,8 +1211,15 @@ function dismissOrderConfirm() {
 
 function acceptPendingOrder() {
     if (pendingOrderLevelId !== null) {
+        const checkResult = checkInventoryForLevel(pendingOrderLevelId);
+        if (!checkResult.sufficient) {
+            showToast('❌ 库存不足，无法接单！请先补货。');
+            return;
+        }
         const id = pendingOrderLevelId;
+        consumeLevelIngredients(id);
         dismissOrderConfirm();
+        showToast('✅ 食材已出库，开始接单！');
         startLevel(id);
     }
 }
@@ -1389,6 +1740,12 @@ class GameEngine {
                 this.combo = 0;
                 this.judges.miss++;
                 this.hp -= HP_DAMAGE_MISS;
+                if (!this.replayMode && note.data.type === 'good') {
+                    const ingId = EMOJI_TO_INGREDIENT[note.data.food];
+                    if (ingId) {
+                        updateInventory(ingId, -MISS_PENALTY);
+                    }
+                }
                 this.showJudge('MISS', 'miss');
                 break;
             case 'bad-cut':
@@ -1397,6 +1754,12 @@ class GameEngine {
                 this.badCutsCount++;
                 this.score = Math.max(0, this.score - 800);
                 this.hp -= HP_DAMAGE_BAD;
+                if (!this.replayMode) {
+                    const ingId = EMOJI_TO_INGREDIENT[note.data.food];
+                    if (ingId) {
+                        updateInventory(ingId, -BAD_FOOD_PENALTY);
+                    }
+                }
                 this.showJudge('BAD CUT!', 'bad');
                 this.showHitFx(note.data.lane, 'bad');
                 break;
@@ -2104,6 +2467,48 @@ function init() {
     });
     document.getElementById('btn-achievements').addEventListener('click', () => {
         showScreen('achievements');
+    });
+    document.getElementById('btn-inventory').addEventListener('click', () => {
+        showScreen('inventory');
+    });
+
+    document.querySelectorAll('.inv-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.inv-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentInvCategory = tab.dataset.category;
+            renderInventoryList();
+        });
+    });
+
+    document.getElementById('btn-restock-all').addEventListener('click', () => {
+        const result = restockAll(20);
+        if (result.success) {
+            renderInventoryPage();
+            showToast(`✅ 一键补货成功！共花费 ¥${result.totalCost.toLocaleString()}`);
+        } else {
+            showToast(`❌ ${result.reason}！需要 ¥${result.totalCost.toLocaleString()}，当前 ¥${result.currentBalance.toLocaleString()}`);
+        }
+    });
+
+    document.getElementById('btn-cancel-restock').addEventListener('click', dismissRestockDialog);
+    document.getElementById('btn-confirm-restock').addEventListener('click', confirmRestock);
+
+    document.getElementById('qty-minus').addEventListener('click', () => {
+        pendingRestockQuantity = Math.max(1, pendingRestockQuantity - 1);
+        document.getElementById('restock-quantity').value = pendingRestockQuantity;
+        updateRestockTotal();
+    });
+    document.getElementById('qty-plus').addEventListener('click', () => {
+        pendingRestockQuantity = Math.min(999, pendingRestockQuantity + 1);
+        document.getElementById('restock-quantity').value = pendingRestockQuantity;
+        updateRestockTotal();
+    });
+    document.getElementById('restock-quantity').addEventListener('change', (e) => {
+        const val = parseInt(e.target.value, 10);
+        pendingRestockQuantity = Math.max(1, Math.min(999, isNaN(val) ? 1 : val));
+        e.target.value = pendingRestockQuantity;
+        updateRestockTotal();
     });
 
     document.getElementById('btn-cancel-order').addEventListener('click', dismissOrderConfirm);

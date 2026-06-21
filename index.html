@@ -16,6 +16,7 @@
         </div>
         <div class="menu-buttons">
             <button id="btn-start" class="btn btn-primary">开始游戏</button>
+            <button id="btn-inventory" class="btn btn-secondary">📦 食材库存</button>
             <button id="btn-achievements" class="btn btn-secondary">🏆 成就墙</button>
             <button id="btn-howto" class="btn btn-secondary">操作说明</button>
         </div>
@@ -88,6 +89,72 @@
         <button class="btn btn-secondary" onclick="showScreen('menu')">返回主菜单</button>
     </div>
 
+    <div id="inventory" class="screen">
+        <div class="inventory-header">
+            <div class="inventory-logo">📦</div>
+            <h2 class="inventory-title">🍴 食材库存管理</h2>
+            <div class="inventory-stats">
+                <div class="inv-stat">
+                    <span class="inv-stat-label">库存总价值</span>
+                    <span id="inv-total-value" class="inv-stat-value">¥0</span>
+                </div>
+                <div class="inv-stat">
+                    <span class="inv-stat-label">食材种类</span>
+                    <span id="inv-total-types" class="inv-stat-value">0</span>
+                </div>
+                <div class="inv-stat">
+                    <span class="inv-stat-label">低库存告警</span>
+                    <span id="inv-low-alert" class="inv-stat-value inv-alert">0</span>
+                </div>
+            </div>
+        </div>
+        <div class="inventory-tabs">
+            <button class="inv-tab active" data-category="all">全部</button>
+            <button class="inv-tab" data-category="vegetable">🥬 蔬菜</button>
+            <button class="inv-tab" data-category="meat">🥩 肉类</button>
+            <button class="inv-tab" data-category="fish">🐟 水产</button>
+            <button class="inv-tab" data-category="other">🥚 其他</button>
+        </div>
+        <div id="inventory-list" class="inventory-list"></div>
+        <div class="inventory-actions">
+            <button id="btn-restock-all" class="btn btn-success">🔄 一键补货</button>
+            <button class="btn btn-secondary" onclick="showScreen('menu')">返回主菜单</button>
+        </div>
+    </div>
+
+    <div id="restock-dialog" class="screen overlay" style="display:none;">
+        <div class="dialog restock-dialog">
+            <div class="restock-header">
+                <div class="restock-icon" id="restock-icon">🥬</div>
+                <h2 id="restock-title">补货</h2>
+            </div>
+            <div class="restock-body">
+                <div class="restock-item-name" id="restock-item-name"></div>
+                <div class="restock-price-info">
+                    <span>单价：</span>
+                    <span id="restock-unit-price">¥0</span>
+                </div>
+                <div class="restock-quantity-control">
+                    <button class="qty-btn" id="qty-minus">-</button>
+                    <input type="number" id="restock-quantity" value="10" min="1" max="999">
+                    <button class="qty-btn" id="qty-plus">+</button>
+                </div>
+                <div class="restock-total">
+                    <span>总计：</span>
+                    <span id="restock-total-price" class="restock-total-price">¥0</span>
+                </div>
+                <div class="restock-balance">
+                    <span>账户余额：</span>
+                    <span id="restock-balance">¥0</span>
+                </div>
+            </div>
+            <div class="dialog-buttons">
+                <button id="btn-cancel-restock" class="btn btn-secondary">取消</button>
+                <button id="btn-confirm-restock" class="btn btn-primary">确认补货</button>
+            </div>
+        </div>
+    </div>
+
     <div id="level-select" class="screen">
         <div class="restaurant-header">
             <div class="restaurant-logo">🍽️</div>
@@ -146,10 +213,18 @@
                         <span id="confirm-price" class="req-value"></span>
                     </div>
                 </div>
+                <div class="confirm-ingredients-section">
+                    <div class="confirm-ingredients-title">🥗 所需食材</div>
+                    <div id="confirm-ingredients-list" class="confirm-ingredients-list"></div>
+                </div>
             </div>
             <div class="confirm-difficulty-row">
                 <span class="confirm-diff-label">难度：</span>
                 <span id="confirm-difficulty" class="confirm-difficulty"></span>
+            </div>
+            <div id="inventory-warning" class="inventory-warning" style="display:none;">
+                <span class="warning-icon">⚠️</span>
+                <span id="inventory-warning-text">库存不足！</span>
             </div>
             <div class="dialog-buttons">
                 <button id="btn-cancel-order" class="btn btn-secondary">取消</button>
