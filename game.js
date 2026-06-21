@@ -398,9 +398,9 @@ function unlockAchievement(achievementId) {
 
 function checkComboAchievements(combo) {
     const newlyUnlocked = [];
-    const save = getSaveData();
+    const latestSave = getSaveData();
     for (const ach of ACHIEVEMENTS) {
-        if (ach.condition.type === 'combo' && !save.achievements[ach.id]) {
+        if (ach.condition.type === 'combo' && !latestSave.achievements[ach.id]) {
             if (combo >= ach.condition.value) {
                 const unlocked = unlockAchievement(ach.id);
                 if (unlocked) newlyUnlocked.push(unlocked);
@@ -412,12 +412,12 @@ function checkComboAchievements(combo) {
 
 function checkDodgeAchievements(dodgeCount) {
     const newlyUnlocked = [];
-    const save = getSaveData();
-    const totalDodges = (save.totalDodges || 0) + dodgeCount;
-    save.totalDodges = totalDodges;
-    saveData(save);
+    const latestSave = getSaveData();
+    const totalDodges = (latestSave.totalDodges || 0) + dodgeCount;
+    latestSave.totalDodges = totalDodges;
+    saveData(latestSave);
     for (const ach of ACHIEVEMENTS) {
-        if (ach.condition.type === 'dodge' && !save.achievements[ach.id]) {
+        if (ach.condition.type === 'dodge' && !latestSave.achievements[ach.id]) {
             if (totalDodges >= ach.condition.value) {
                 const unlocked = unlockAchievement(ach.id);
                 if (unlocked) newlyUnlocked.push(unlocked);
@@ -1077,7 +1077,6 @@ function startLevel(levelId) {
 
 // ==================== 关卡完成 ====================
 function onLevelComplete(engine) {
-    const save = getSaveData();
     const level = engine.level;
     const finalScore = Math.floor(engine.score);
     const passed = finalScore >= level.targetScore && engine.hp > 0;
@@ -1093,13 +1092,16 @@ function onLevelComplete(engine) {
     else if (accuracy >= 0.5) rank = 'C';
     else rank = 'F';
 
-    // 成就检测
+    // 成就检测（必须先执行，会修改保存数据）
     if (!engine.replayMode) {
         const sRankUnlocked = checkSRankAchievements(level.id, rank);
         sRankUnlocked.forEach(ach => showAchievementPopup(ach));
         const dodgeUnlocked = checkDodgeAchievements(engine.dodgeCount);
         dodgeUnlocked.forEach(ach => showAchievementPopup(ach));
     }
+
+    // 成就检测完成后再读取最新的 save 数据，避免覆盖成就
+    const save = getSaveData();
 
     // 更新记录
     let newUnlock = false;
