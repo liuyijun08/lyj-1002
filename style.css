@@ -133,6 +133,77 @@ body {
     box-shadow: 0 12px 40px rgba(0, 214, 143, 0.6);
 }
 
+.btn-success.btn-unlock-anim {
+    animation: unlockBtnGlow 1.5s ease infinite, unlockBtnBounce 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    overflow: visible;
+}
+
+.btn-success.btn-unlock-anim::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #ffd700, #ff6b6b, #00d68f, #4d96ff, #ffd700);
+    background-size: 400% 400%;
+    animation: unlockBorderShift 2.5s ease infinite;
+    z-index: -1;
+    opacity: 0.9;
+}
+
+.btn-success.btn-unlock-anim::after {
+    content: '✨';
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    font-size: 24px;
+    animation: unlockSparkle 0.8s ease infinite alternate;
+}
+
+.btn-success.btn-unlock-anim .btn-sparkle {
+    position: absolute;
+    font-size: 16px;
+    animation: sparkleFloat 2s ease infinite;
+    pointer-events: none;
+}
+
+.btn-success.btn-unlock-anim .btn-sparkle:nth-child(1) { left: 10%; animation-delay: 0s; }
+.btn-success.btn-unlock-anim .btn-sparkle:nth-child(2) { left: 30%; animation-delay: 0.5s; }
+.btn-success.btn-unlock-anim .btn-sparkle:nth-child(3) { left: 50%; animation-delay: 1s; }
+.btn-success.btn-unlock-anim .btn-sparkle:nth-child(4) { left: 70%; animation-delay: 1.5s; }
+.btn-success.btn-unlock-anim .btn-sparkle:nth-child(5) { left: 90%; animation-delay: 2s; }
+
+@keyframes unlockBtnGlow {
+    0%, 100% { box-shadow: 0 0 20px rgba(0, 214, 143, 0.6), 0 0 40px rgba(255, 215, 0, 0.3), 0 0 60px rgba(255, 107, 107, 0.2); }
+    50% { box-shadow: 0 0 35px rgba(0, 214, 143, 0.9), 0 0 70px rgba(255, 215, 0, 0.6), 0 0 100px rgba(255, 107, 107, 0.4); }
+}
+
+@keyframes unlockBtnBounce {
+    0% { transform: scale(0.4) rotate(-10deg); opacity: 0; }
+    30% { transform: scale(1.2) rotate(3deg); opacity: 1; }
+    50% { transform: scale(0.95) rotate(-1deg); }
+    70% { transform: scale(1.05) rotate(1deg); }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes unlockBorderShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+@keyframes unlockSparkle {
+    from { transform: scale(1) rotate(0deg); opacity: 1; }
+    to { transform: scale(1.4) rotate(20deg); opacity: 0.6; }
+}
+
+@keyframes sparkleFloat {
+    0%, 100% { transform: translateY(0) scale(1); opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    50% { transform: translateY(-30px) scale(1.2); }
+}
+
 .btn-danger {
     background: linear-gradient(135deg, #e74c3c, #c0392b);
     box-shadow: 0 8px 30px rgba(231, 76, 60, 0.4);
@@ -753,6 +824,152 @@ h2 {
 @keyframes unlockPulse {
     0%, 100% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.3); }
     50% { box-shadow: 0 0 40px rgba(255, 215, 0, 0.6); }
+}
+
+.level-hint-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    animation: hintOverlayIn 0.3s ease;
+}
+
+@keyframes hintOverlayIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.level-hint-card {
+    background: linear-gradient(145deg, rgba(40, 40, 70, 0.97), rgba(20, 20, 50, 0.97));
+    border: 2px solid rgba(255, 215, 0, 0.4);
+    border-radius: 24px;
+    padding: 36px 40px;
+    min-width: 340px;
+    max-width: 420px;
+    text-align: center;
+    box-shadow: 0 0 60px rgba(255, 215, 0, 0.2), 0 20px 80px rgba(0, 0, 0, 0.5);
+    position: relative;
+    overflow: visible;
+}
+
+.level-hint-card.hint-enter {
+    animation: hintCardIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), hintCardGlow 2s ease-in-out infinite;
+}
+
+.level-hint-card::before,
+.level-hint-card::after {
+    content: '✨';
+    position: absolute;
+    font-size: 28px;
+    animation: hintSparkle 1.5s ease-in-out infinite;
+}
+
+.level-hint-card::before {
+    top: -15px;
+    left: -15px;
+    animation-delay: 0s;
+}
+
+.level-hint-card::after {
+    bottom: -15px;
+    right: -15px;
+    animation-delay: 0.8s;
+}
+
+@keyframes hintSparkle {
+    0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    50% { transform: scale(1.3) rotate(15deg); opacity: 0.7; }
+}
+
+@keyframes hintCardGlow {
+    0%, 100% { box-shadow: 0 0 60px rgba(255, 215, 0, 0.2), 0 20px 80px rgba(0, 0, 0, 0.5); }
+    50% { box-shadow: 0 0 80px rgba(255, 215, 0, 0.4), 0 20px 80px rgba(0, 0, 0, 0.5), 0 0 120px rgba(255, 107, 107, 0.2); }
+}
+
+@keyframes hintCardIn {
+    0% { transform: scale(0.5) translateY(40px); opacity: 0; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.level-hint-badge {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--perfect);
+    background: rgba(255, 215, 0, 0.15);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    border-radius: 20px;
+    padding: 6px 18px;
+    display: inline-block;
+    margin-bottom: 20px;
+    animation: hintBadgePulse 2s ease infinite;
+}
+
+@keyframes hintBadgePulse {
+    0%, 100% { box-shadow: 0 0 10px rgba(255, 215, 0, 0.2); }
+    50% { box-shadow: 0 0 25px rgba(255, 215, 0, 0.5); }
+}
+
+.level-hint-num {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+}
+
+.level-hint-name {
+    font-size: 28px;
+    font-weight: 900;
+    margin-bottom: 10px;
+    background: linear-gradient(135deg, #ff6b6b, #ffd93d);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.level-hint-recipe {
+    font-size: 18px;
+    color: var(--text);
+    margin-bottom: 14px;
+}
+
+.level-hint-diff-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.level-hint-diff {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.level-hint-target {
+    font-size: 14px;
+    color: var(--perfect);
+    font-weight: bold;
+}
+
+.level-hint-tip {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-dim);
+    text-align: left;
+}
+
+.level-hint-dismiss {
+    min-width: 160px;
 }
 
 .replay-header {

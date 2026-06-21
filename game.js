@@ -213,22 +213,66 @@ function loadLevelData() {
     LEVELS[4].data = generateLevel5();
 }
 
+const LEVEL_HINTS = {
+    2: '节奏加快了！注意轨道会出现随机位置的好食材，还有更多坏食材混入，保持专注！',
+    3: '双键同按来了！有时需要同时按下两个键，注意观察同时出现的食材。坏食材也会成对出现，小心躲避！',
+    4: '高速模式！节奏飞快，会出现三键同时按和对称图案。专注判断线，提前预判是关键！',
+    5: '终极挑战！全轨道齐发、随机节奏、高密度坏食材……只有真正的节奏大师才能通关！'
+};
+
+function showLevelHintCard(levelId) {
+    const save = getSaveData();
+    if (save.seenHints.includes(levelId)) return;
+
+    const activeScreen = document.querySelector('.screen.active');
+    if (!activeScreen || (activeScreen.id !== 'level-select' && activeScreen.id !== 'result')) return;
+
+    const lvl = LEVELS.find(l => l.id === levelId);
+    if (!lvl) return;
+
+    document.getElementById('hint-level-num').textContent = '第 ' + lvl.id + ' 关';
+    document.getElementById('hint-level-name').textContent = lvl.name;
+    document.getElementById('hint-level-recipe').textContent = lvl.recipe;
+
+    const diffEl = document.getElementById('hint-level-diff');
+    diffEl.textContent = lvl.difficultyLabel;
+    diffEl.className = 'level-hint-diff diff-' + lvl.difficulty;
+
+    document.getElementById('hint-level-target').textContent = '🎯 目标: ' + lvl.targetScore.toLocaleString();
+    document.getElementById('hint-level-tip').textContent = LEVEL_HINTS[levelId] || '新的挑战在等着你！';
+
+    const overlay = document.getElementById('level-hint-overlay');
+    const card = document.getElementById('level-hint-card');
+    overlay.style.display = '';
+    card.classList.remove('hint-enter');
+    void card.offsetWidth;
+    card.classList.add('hint-enter');
+
+    save.seenHints.push(levelId);
+    saveData(save);
+}
+
+function dismissLevelHint() {
+    document.getElementById('level-hint-overlay').style.display = 'none';
+}
+
 // ==================== 存储系统 ====================
 const SAVE_KEY = 'rhythm-chef-save';
 
 function getSaveData() {
     try {
         const raw = localStorage.getItem(SAVE_KEY);
-        if (!raw) return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {} };
+        if (!raw) return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [] };
         const data = JSON.parse(raw);
         return {
             unlocked: data.unlocked || 1,
             bestScores: data.bestScores || {},
             replays: data.replays || {},
-            lastReplays: data.lastReplays || {}
+            lastReplays: data.lastReplays || {},
+            seenHints: data.seenHints || []
         };
     } catch {
-        return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {} };
+        return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [] };
     }
 }
 
@@ -271,6 +315,13 @@ function renderLevelSelect() {
         }
         list.appendChild(card);
     });
+
+    for (let i = 2; i <= save.unlocked; i++) {
+        if (!save.seenHints.includes(i)) {
+            setTimeout(() => showLevelHintCard(i), 300);
+            break;
+        }
+    }
 }
 
 // ==================== 游戏引擎 ====================
@@ -750,6 +801,9 @@ function onLevelComplete(engine) {
     document.getElementById('result-miss').textContent = judges.miss + judges.bad;
 
     const unlockMsg = document.getElementById('unlock-msg');
+    const btnNext = document.getElementById('btn-next-level');
+    btnNext.classList.remove('btn-unlock-anim');
+    btnNext.querySelectorAll('.btn-sparkle').forEach(el => el.remove());
     if (newUnlock) {
         const nextLvl = LEVELS.find(l => l.id === level.id + 1);
         unlockMsg.textContent = `🎊 解锁新关卡：第${nextLvl.id}关 ${nextLvl.name}`;
@@ -758,10 +812,20 @@ function onLevelComplete(engine) {
         unlockMsg.style.display = 'none';
     }
 
-    // 按钮显示
-    const btnNext = document.getElementById('btn-next-level');
     const nextLvl = LEVELS.find(l => l.id === level.id + 1);
     btnNext.style.display = (passed && nextLvl && nextLvl.id <= save.unlocked) ? '' : 'none';
+
+    if (newUnlock && nextLvl) {
+        btnNext.classList.add('btn-unlock-anim');
+        ['✨', '⭐', '💫', '🌟', '✨'].forEach((emoji, i) => {
+            const sp = document.createElement('span');
+            sp.className = 'btn-sparkle';
+            sp.textContent = emoji;
+            sp.style.top = '-20px';
+            btnNext.appendChild(sp);
+        });
+        setTimeout(() => showLevelHintCard(nextLvl.id), 600);
+    }
 
     const btnReplay = document.getElementById('btn-watch-replay');
     btnReplay.style.display = '';
@@ -879,17 +943,29 @@ function init() {
 
     // 结果页按钮
     document.getElementById('btn-retry').addEventListener('click', () => {
+        dismissLevelHint();
+        const btnNext = document.getElementById('btn-next-level');
+        btnNext.classList.remove('btn-unlock-anim');
+        btnNext.querySelectorAll('.btn-sparkle').forEach(el => el.remove());
         const levelId = game ? game.level.id : 1;
         startLevel(levelId);
     });
     document.getElementById('btn-watch-replay').addEventListener('click', () => {
         if (!game) return;
+        dismissLevelHint();
+        const btnNext = document.getElementById('btn-next-level');
+        btnNext.classList.remove('btn-unlock-anim');
+        btnNext.querySelectorAll('.btn-sparkle').forEach(el => el.remove());
         const levelId = game.level.id;
         document.getElementById('result').classList.remove('active');
         watchReplay(levelId);
     });
     document.getElementById('btn-next-level').addEventListener('click', () => {
         if (!game) return;
+        dismissLevelHint();
+        const btnNext = document.getElementById('btn-next-level');
+        btnNext.classList.remove('btn-unlock-anim');
+        btnNext.querySelectorAll('.btn-sparkle').forEach(el => el.remove());
         const nextId = game.level.id + 1;
         if (LEVELS.find(l => l.id === nextId)) {
             startLevel(nextId);
@@ -898,9 +974,15 @@ function init() {
         }
     });
     document.getElementById('btn-back-levels').addEventListener('click', () => {
+        dismissLevelHint();
+        const btnNext = document.getElementById('btn-next-level');
+        btnNext.classList.remove('btn-unlock-anim');
+        btnNext.querySelectorAll('.btn-sparkle').forEach(el => el.remove());
         document.getElementById('result').classList.remove('active');
         showScreen('level-select');
     });
+
+    document.getElementById('hint-dismiss-btn').addEventListener('click', dismissLevelHint);
 
     // 回放退出
     document.getElementById('btn-exit-replay').addEventListener('click', exitReplay);
