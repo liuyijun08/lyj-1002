@@ -219,15 +219,16 @@ const SAVE_KEY = 'rhythm-chef-save';
 function getSaveData() {
     try {
         const raw = localStorage.getItem(SAVE_KEY);
-        if (!raw) return { unlocked: 1, bestScores: {}, replays: {} };
+        if (!raw) return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {} };
         const data = JSON.parse(raw);
         return {
             unlocked: data.unlocked || 1,
             bestScores: data.bestScores || {},
-            replays: data.replays || {}
+            replays: data.replays || {},
+            lastReplays: data.lastReplays || {}
         };
     } catch {
-        return { unlocked: 1, bestScores: {}, replays: {} };
+        return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {} };
     }
 }
 
@@ -726,9 +727,12 @@ function onLevelComplete(engine) {
         }
     }
     const prevBest = save.bestScores[level.id] || 0;
+    const thisReplay = engine.getReplayData();
+    if (!save.lastReplays) save.lastReplays = {};
+    save.lastReplays[level.id] = thisReplay;
     if (finalScore > prevBest) {
         save.bestScores[level.id] = finalScore;
-        save.replays[level.id] = engine.getReplayData();
+        save.replays[level.id] = thisReplay;
     }
     saveData(save);
 
@@ -760,15 +764,20 @@ function onLevelComplete(engine) {
     btnNext.style.display = (passed && nextLvl && nextLvl.id <= save.unlocked) ? '' : 'none';
 
     const btnReplay = document.getElementById('btn-watch-replay');
-    btnReplay.style.display = save.replays[level.id] ? '' : 'none';
+    btnReplay.style.display = '';
 
     showScreen('result');
 }
 
 // ==================== 回放系统 ====================
-function watchReplay(levelId) {
-    const save = getSaveData();
-    const replay = save.replays[levelId];
+function watchReplay(levelId, replayData = null) {
+    let replay = replayData;
+    if (!replay) {
+        const save = getSaveData();
+        replay = save.lastReplays && save.lastReplays[levelId]
+            ? save.lastReplays[levelId]
+            : save.replays[levelId];
+    }
     if (!replay) {
         alert('没有可用的回放记录！');
         return;
@@ -824,7 +833,8 @@ function pauseGame() {
     if (!game) return;
     game.pause();
     document.getElementById('pause').classList.add('active');
-    const hasReplay = !!getSaveData().replays[game.level.id];
+    const save = getSaveData();
+    const hasReplay = !!(save.replays[game.level.id] || (save.lastReplays && save.lastReplays[game.level.id]));
     document.getElementById('btn-replay-menu').style.display = hasReplay ? '' : 'none';
 }
 
