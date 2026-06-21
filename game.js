@@ -220,6 +220,105 @@ const LEVEL_HINTS = {
     5: '终极挑战！全轨道齐发、随机节奏、高密度坏食材……只有真正的节奏大师才能通关！'
 };
 
+const ACHIEVEMENTS = [
+    {
+        id: 'combo_10',
+        name: '初露锋芒',
+        description: '达成10连击',
+        icon: '⭐',
+        category: 'combo',
+        condition: { type: 'combo', value: 10 },
+        title: '连击新手'
+    },
+    {
+        id: 'combo_30',
+        name: '连击达人',
+        description: '达成30连击',
+        icon: '🌟',
+        category: 'combo',
+        condition: { type: 'combo', value: 30 },
+        title: '连击达人'
+    },
+    {
+        id: 'combo_50',
+        name: '连击大师',
+        description: '达成50连击',
+        icon: '💫',
+        category: 'combo',
+        condition: { type: 'combo', value: 50 },
+        title: '连击大师'
+    },
+    {
+        id: 'combo_100',
+        name: '连击之神',
+        description: '达成100连击',
+        icon: '🔥',
+        category: 'combo',
+        condition: { type: 'combo', value: 100 },
+        title: '连击之神'
+    },
+    {
+        id: 'dodge_10',
+        name: '火眼金睛',
+        description: '成功闪避10个坏食材',
+        icon: '👁️',
+        category: 'dodge',
+        condition: { type: 'dodge', value: 10 },
+        title: '火眼金睛'
+    },
+    {
+        id: 'dodge_30',
+        name: '闪避高手',
+        description: '成功闪避30个坏食材',
+        icon: '🎯',
+        category: 'dodge',
+        condition: { type: 'dodge', value: 30 },
+        title: '闪避高手'
+    },
+    {
+        id: 'dodge_50',
+        name: '完美避障',
+        description: '成功闪避50个坏食材',
+        icon: '🏆',
+        category: 'dodge',
+        condition: { type: 'dodge', value: 50 },
+        title: '完美避障'
+    },
+    {
+        id: 's_rank_1',
+        name: 'S级入门',
+        description: '第1关获得S评级',
+        icon: '🥇',
+        category: 'srank',
+        condition: { type: 'srank', level: 1 },
+        title: 'S级新人'
+    },
+    {
+        id: 's_rank_3',
+        name: 'S级主厨',
+        description: '第3关获得S评级',
+        icon: '👨‍🍳',
+        category: 'srank',
+        condition: { type: 'srank', level: 3 },
+        title: 'S级主厨'
+    },
+    {
+        id: 's_rank_5',
+        name: 'S级宗师',
+        description: '第5关获得S评级',
+        icon: '👑',
+        category: 'srank',
+        condition: { type: 'srank', level: 5 },
+        title: 'S级宗师'
+    }
+];
+
+const TITLE_CATEGORIES = {
+    combo: '连击称号',
+    dodge: '闪避称号',
+    srank: '评级称号'
+};
+
 function showLevelHintCard(levelId) {
     const save = getSaveData();
     if (save.seenHints.includes(levelId)) return;
@@ -262,17 +361,20 @@ const SAVE_KEY = 'rhythm-chef-save';
 function getSaveData() {
     try {
         const raw = localStorage.getItem(SAVE_KEY);
-        if (!raw) return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [] };
+        if (!raw) return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [], achievements: {}, equippedTitle: null, totalDodges: 0 };
         const data = JSON.parse(raw);
         return {
             unlocked: data.unlocked || 1,
             bestScores: data.bestScores || {},
             replays: data.replays || {},
             lastReplays: data.lastReplays || {},
-            seenHints: data.seenHints || []
+            seenHints: data.seenHints || [],
+            achievements: data.achievements || {},
+            equippedTitle: data.equippedTitle || null,
+            totalDodges: data.totalDodges || 0
         };
     } catch {
-        return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [] };
+        return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [], achievements: {}, equippedTitle: null, totalDodges: 0 };
     }
 }
 
@@ -284,11 +386,206 @@ function saveData(data) {
     }
 }
 
+function unlockAchievement(achievementId) {
+    const save = getSaveData();
+    if (save.achievements[achievementId]) return null;
+    const achievement = ACHIEVEMENTS.find(a => a.id === achievementId);
+    if (!achievement) return null;
+    save.achievements[achievementId] = { unlockedAt: Date.now() };
+    saveData(save);
+    return achievement;
+}
+
+function checkComboAchievements(combo) {
+    const newlyUnlocked = [];
+    const save = getSaveData();
+    for (const ach of ACHIEVEMENTS) {
+        if (ach.condition.type === 'combo' && !save.achievements[ach.id]) {
+            if (combo >= ach.condition.value) {
+                const unlocked = unlockAchievement(ach.id);
+                if (unlocked) newlyUnlocked.push(unlocked);
+            }
+        }
+    }
+    return newlyUnlocked;
+}
+
+function checkDodgeAchievements(dodgeCount) {
+    const newlyUnlocked = [];
+    const save = getSaveData();
+    const totalDodges = (save.totalDodges || 0) + dodgeCount;
+    save.totalDodges = totalDodges;
+    saveData(save);
+    for (const ach of ACHIEVEMENTS) {
+        if (ach.condition.type === 'dodge' && !save.achievements[ach.id]) {
+            if (totalDodges >= ach.condition.value) {
+                const unlocked = unlockAchievement(ach.id);
+                if (unlocked) newlyUnlocked.push(unlocked);
+            }
+        }
+    }
+    return newlyUnlocked;
+}
+
+function checkSRankAchievements(levelId, rank) {
+    const newlyUnlocked = [];
+    if (rank !== 'S') return newlyUnlocked;
+    for (const ach of ACHIEVEMENTS) {
+        if (ach.condition.type === 'srank' && ach.condition.level === levelId) {
+            const unlocked = unlockAchievement(ach.id);
+            if (unlocked) newlyUnlocked.push(unlocked);
+        }
+    }
+    return newlyUnlocked;
+}
+
+function showAchievementPopup(achievement) {
+    let popup = document.getElementById('achievement-popup');
+    if (!popup) {
+        popup = document.createElement('div');
+        popup.id = 'achievement-popup';
+        popup.className = 'achievement-popup';
+        document.body.appendChild(popup);
+    }
+    popup.innerHTML = `
+        <div class="achievement-popup-content">
+            <div class="achievement-popup-badge">🏅</div>
+            <div class="achievement-popup-info">
+                <div class="achievement-popup-title">成就解锁！</div>
+                <div class="achievement-popup-icon">${achievement.icon}</div>
+                <div class="achievement-popup-name">${achievement.name}</div>
+                <div class="achievement-popup-desc">${achievement.description}</div>
+            </div>
+        </div>
+    `;
+    popup.classList.add('show');
+    setTimeout(() => {
+        popup.classList.remove('show');
+    }, 3000);
+}
+
+function getEquippedTitle() {
+    const save = getSaveData();
+    if (!save.equippedTitle) return null;
+    const ach = ACHIEVEMENTS.find(a => a.id === save.equippedTitle);
+    return ach ? ach.title : null;
+}
+
+function equipTitle(achievementId) {
+    const save = getSaveData();
+    if (!save.achievements[achievementId]) return false;
+    save.equippedTitle = achievementId;
+    saveData(save);
+    return true;
+}
+
+function unequipTitle() {
+    const save = getSaveData();
+    save.equippedTitle = null;
+    saveData(save);
+}
+
+let currentAchCategory = 'all';
+
+function renderAchievementsPage() {
+    const save = getSaveData();
+    const unlockedCount = Object.keys(save.achievements).length;
+    const totalCount = ACHIEVEMENTS.length;
+
+    document.getElementById('ach-unlocked-count').textContent = unlockedCount;
+    document.getElementById('ach-total-count').textContent = totalCount;
+
+    const currentTitle = getEquippedTitle();
+    document.getElementById('ach-current-title').textContent = currentTitle || '无';
+
+    renderAchievementsList();
+    renderTitlesList();
+    updateUnequipButton();
+}
+
+function renderAchievementsList() {
+    const save = getSaveData();
+    const listEl = document.getElementById('achievements-list');
+    listEl.innerHTML = '';
+
+    const filtered = currentAchCategory === 'all'
+        ? ACHIEVEMENTS
+        : ACHIEVEMENTS.filter(a => a.category === currentAchCategory);
+
+    filtered.forEach(ach => {
+        const unlocked = !!save.achievements[ach.id];
+        const card = document.createElement('div');
+        card.className = 'achievement-card ' + (unlocked ? 'unlocked' : 'locked');
+        card.innerHTML = `
+            <div class="achievement-icon">${unlocked ? ach.icon : '🔒'}</div>
+            <div class="achievement-info">
+                <div class="achievement-name">${ach.name}</div>
+                <div class="achievement-desc">${ach.description}</div>
+            </div>
+            <span class="achievement-status ${unlocked ? 'unlocked' : 'locked'}">${unlocked ? '已解锁' : '未解锁'}</span>
+        `;
+        listEl.appendChild(card);
+    });
+}
+
+function renderTitlesList() {
+    const save = getSaveData();
+    const listEl = document.getElementById('titles-list');
+    listEl.innerHTML = '';
+
+    ACHIEVEMENTS.forEach(ach => {
+        const unlocked = !!save.achievements[ach.id];
+        const equipped = save.equippedTitle === ach.id;
+        const badge = document.createElement('div');
+        let cls = 'title-badge';
+        if (equipped) cls += ' equipped';
+        else if (unlocked) cls += ' available';
+        else cls += ' locked';
+        badge.className = cls;
+        badge.textContent = unlocked ? ach.title : '???';
+        if (unlocked) {
+            badge.addEventListener('click', () => {
+                if (equipped) {
+                    unequipTitle();
+                } else {
+                    equipTitle(ach.id);
+                }
+                renderTitlesList();
+                updateUnequipButton();
+                const currentTitle = getEquippedTitle();
+                document.getElementById('ach-current-title').textContent = currentTitle || '无';
+            });
+        }
+        listEl.appendChild(badge);
+    });
+}
+
+function updateUnequipButton() {
+    const save = getSaveData();
+    const btn = document.getElementById('btn-unequip-title');
+    if (btn) {
+        btn.style.display = save.equippedTitle ? '' : 'none';
+    }
+}
+
+function updateMenuTitle() {
+    const title = getEquippedTitle();
+    const el = document.getElementById('equipped-title-display');
+    if (el && title) {
+        el.textContent = '🎖️ ' + title;
+        el.style.display = 'inline-block';
+    } else if (el) {
+        el.style.display = 'none';
+    }
+}
+
 // ==================== 屏幕切换 ====================
 function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     if (id === 'level-select') renderLevelSelect();
+    if (id === 'achievements') renderAchievementsPage();
+    if (id === 'menu') updateMenuTitle();
 }
 
 // ==================== 关卡选择 ====================
@@ -353,6 +650,9 @@ class GameEngine {
         this.currentReplayIndex = 0;
 
         this.keydownReplayFrames = [];
+
+        this.dodgeCount = 0;
+        this.newlyUnlockedAchievements = [];
     }
 
     start(levelId, replayData = null) {
@@ -374,6 +674,8 @@ class GameEngine {
         this.maxCombo = 0;
         this.hp = MAX_HP;
         this.judges = { perfect: 0, great: 0, good: 0, miss: 0, bad: 0 };
+        this.dodgeCount = 0;
+        this.newlyUnlockedAchievements = [];
         this.replay = replayData;
         this.currentReplayIndex = 0;
         this.replayActions = replayData ? (replayData.actions || []) : [];
@@ -630,6 +932,13 @@ class GameEngine {
             case 'perfect':
                 this.combo++;
                 this.maxCombo = Math.max(this.maxCombo, this.combo);
+                if (!this.replayMode) {
+                    const unlocked = checkComboAchievements(this.combo);
+                    unlocked.forEach(ach => {
+                        this.newlyUnlockedAchievements.push(ach);
+                        showAchievementPopup(ach);
+                    });
+                }
                 {
                     const steps = Math.floor(this.combo / COMBO_BONUS_STEP);
                     const bonusPerfect = 1 + Math.min(steps * COMBO_BONUS_PER_STEP, MAX_COMBO_BONUS - 1);
@@ -643,6 +952,13 @@ class GameEngine {
             case 'great':
                 this.combo++;
                 this.maxCombo = Math.max(this.maxCombo, this.combo);
+                if (!this.replayMode) {
+                    const unlocked = checkComboAchievements(this.combo);
+                    unlocked.forEach(ach => {
+                        this.newlyUnlockedAchievements.push(ach);
+                        showAchievementPopup(ach);
+                    });
+                }
                 {
                     const steps = Math.floor(this.combo / COMBO_BONUS_STEP);
                     const bonusGreat = 1 + Math.min(steps * COMBO_BONUS_PER_STEP, MAX_COMBO_BONUS - 1);
@@ -655,6 +971,13 @@ class GameEngine {
             case 'good':
                 this.combo++;
                 this.maxCombo = Math.max(this.maxCombo, this.combo);
+                if (!this.replayMode) {
+                    const unlocked = checkComboAchievements(this.combo);
+                    unlocked.forEach(ach => {
+                        this.newlyUnlockedAchievements.push(ach);
+                        showAchievementPopup(ach);
+                    });
+                }
                 {
                     const steps = Math.floor(this.combo / COMBO_BONUS_STEP);
                     const bonusGood = 1 + Math.min(steps * COMBO_BONUS_PER_STEP, MAX_COMBO_BONUS - 1);
@@ -683,6 +1006,7 @@ class GameEngine {
                 // 坏食材成功躲避：少量加分
                 this.judges.bad++;
                 this.score += 50;
+                this.dodgeCount++;
                 break;
         }
 
@@ -768,6 +1092,14 @@ function onLevelComplete(engine) {
     else if (accuracy >= 0.7) rank = 'B';
     else if (accuracy >= 0.5) rank = 'C';
     else rank = 'F';
+
+    // 成就检测
+    if (!engine.replayMode) {
+        const sRankUnlocked = checkSRankAchievements(level.id, rank);
+        sRankUnlocked.forEach(ach => showAchievementPopup(ach));
+        const dodgeUnlocked = checkDodgeAchievements(engine.dodgeCount);
+        dodgeUnlocked.forEach(ach => showAchievementPopup(ach));
+    }
 
     // 更新记录
     let newUnlock = false;
@@ -928,6 +1260,30 @@ function init() {
     document.getElementById('btn-howto').addEventListener('click', () => {
         showScreen('howto');
     });
+    document.getElementById('btn-achievements').addEventListener('click', () => {
+        showScreen('achievements');
+    });
+
+    // 成就分类标签
+    document.querySelectorAll('.ach-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.ach-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentAchCategory = tab.dataset.category;
+            renderAchievementsList();
+        });
+    });
+
+    // 卸下称号按钮
+    const unequipBtn = document.getElementById('btn-unequip-title');
+    if (unequipBtn) {
+        unequipBtn.addEventListener('click', () => {
+            unequipTitle();
+            renderTitlesList();
+            updateUnequipButton();
+            document.getElementById('ach-current-title').textContent = '无';
+        });
+    }
 
     // 暂停菜单
     document.getElementById('btn-pause').addEventListener('click', pauseGame);
@@ -986,6 +1342,9 @@ function init() {
 
     // 回放退出
     document.getElementById('btn-exit-replay').addEventListener('click', exitReplay);
+
+    // 初始更新菜单称号
+    updateMenuTitle();
 }
 
 document.addEventListener('DOMContentLoaded', init);

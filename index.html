@@ -10,9 +10,13 @@
 <div id="app">
     <div id="menu" class="screen active">
         <h1 class="title">🔪 节奏切菜大师 🔪</h1>
-        <p class="subtitle">跟随节拍，切出完美菜品！</p>
+        <div id="menu-title-container" class="menu-title-container">
+            <p class="subtitle">跟随节拍，切出完美菜品！</p>
+            <div id="equipped-title-display" class="equipped-title-display" style="display:none;"></div>
+        </div>
         <div class="menu-buttons">
             <button id="btn-start" class="btn btn-primary">开始游戏</button>
+            <button id="btn-achievements" class="btn btn-secondary">🏆 成就墙</button>
             <button id="btn-howto" class="btn btn-secondary">操作说明</button>
         </div>
     </div>
@@ -46,6 +50,42 @@
             </div>
         </div>
         <button class="btn btn-secondary" onclick="showScreen('menu')">返回</button>
+    </div>
+
+    <div id="achievements" class="screen">
+        <h2>🏆 成就墙</h2>
+        <div class="achievements-stats">
+            <div class="achievement-stat">
+                <span class="stat-label">已解锁</span>
+                <span id="ach-unlocked-count" class="stat-value">0</span>
+            </div>
+            <div class="achievement-stat">
+                <span class="stat-label">总计</span>
+                <span id="ach-total-count" class="stat-value">0</span>
+            </div>
+            <div class="achievement-stat">
+                <span class="stat-label">当前称号</span>
+                <span id="ach-current-title" class="stat-value">无</span>
+            </div>
+        </div>
+
+        <div class="achievements-tabs">
+            <button class="ach-tab active" data-category="all">全部</button>
+            <button class="ach-tab" data-category="combo">连击</button>
+            <button class="ach-tab" data-category="dodge">闪避</button>
+            <button class="ach-tab" data-category="srank">S级</button>
+        </div>
+
+        <div id="achievements-list" class="achievements-list"></div>
+
+        <div class="title-section">
+            <h3>🎖️ 称号佩戴</h3>
+            <p class="title-section-desc">选择一个已解锁的称号，在主菜单展示</p>
+            <div id="titles-list" class="titles-list"></div>
+            <button id="btn-unequip-title" class="btn btn-secondary btn-small" style="display:none;">卸下称号</button>
+        </div>
+
+        <button class="btn btn-secondary" onclick="showScreen('menu')">返回主菜单</button>
     </div>
 
     <div id="level-select" class="screen">
