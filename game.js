@@ -756,6 +756,9 @@ class GameEngine {
 
         this.dodgeCount = 0;
         this.newlyUnlockedAchievements = [];
+
+        this.timelineDuration = 0;
+        this.timelineSeekable = false;
     }
 
     start(levelId, replayData = null) {
@@ -794,6 +797,11 @@ class GameEngine {
         this.pauseOffset = 0;
         this.startTime = performance.now();
         this.lastFrameTime = this.startTime;
+
+        if (this.replayMode && replayData) {
+            this.initTimeline(replayData);
+        }
+
         this.loop();
     }
 
@@ -893,10 +901,16 @@ class GameEngine {
         this.checkMissedNotes(now);
         this.updateHUD();
 
+        if (this.replayMode) {
+            this.updateTimelinePlayhead(now);
+        }
+
         // 检查关卡结束
         if (this.allNotesPassed(now) && this.activeNotes.length === 0) {
             this.running = false;
-            if (!this.replayMode) {
+            if (this.replayMode) {
+                this.updateTimelinePlayhead(this.duration);
+            } else {
                 setTimeout(() => onLevelComplete(this), 500);
             }
             return;
@@ -1158,6 +1172,320 @@ class GameEngine {
             judges: { ...this.judges },
             timestamp: Date.now()
         };
+    }
+
+    initTimeline(replayData) {
+        const notes = replayData.chart || [];
+        const actions = replayData.actions || [];
+        const hits = replayData.hits || [];
+
+        const lastNoteTime = notes.length > 0 ? Math.max(...notes.map(n => n.time)) : 0;
+        const lastActionTime = actions.length > 0 ? Math.max(...actions.map(a => a.time)) : 0;
+        const lastHitTime = hits.length > 0 ? Math.max(...hits.map(h => h.time)) : 0;
+        this.timelineDuration = Math.max(lastNoteTime, lastActionTime, lastHitTime) + 500;
+
+        this.renderTimeline(notes, actions, hits);
+        this.timelineSeekable = true;
+        this.setupTimelineInteractions();
+
+        const track = document.querySelector('.timeline-track');
+        if (track) {
+            track.scrollLeft = 0;
+        }
+    }
+
+    renderTimeline(notes, actions, hits) {
+        const duration = this.timelineDuration;
+        const laneContents = document.querySelectorAll('.timeline-lane-content[data-lane]');
+        const judgeContent = document.querySelector('.timeline-judge-content');
+        const dodgeContent = document.querySelector('.timeline-dodge-content');
+        const track = document.querySelector('.timeline-track');
+
+        const minWidth = 800;
+        const pixelsPerSecond = 150;
+        const contentWidth = Math.max(minWidth, (duration / 1000) * pixelsPerSecond);
+
+        laneContents.forEach(el => {
+            el.style.minWidth = contentWidth + 'px';
+        });
+        if (judgeContent) judgeContent.style.minWidth = contentWidth + 'px';
+        if (dodgeContent) dodgeContent.style.minWidth = contentWidth + 'px';
+
+        laneContents.forEach(el => el.innerHTML = '');
+        if (judgeContent) judgeContent.innerHTML = '';
+        if (dodgeContent) dodgeContent.innerHTML = '';
+
+        actions.forEach(action => {
+            if (action.type === 'down') {
+                const laneEl = document.querySelector(`.timeline-lane-content[data-lane="${action.lane}"]`);
+                if (laneEl) {
+                    const note = document.createElement('div');
+                    note.className = `timeline-note key-press lane-${action.lane}`;
+                    const left = (action.time / duration) * 100;
+                    note.style.left = `calc(${left}% - 5px)`;
+                    note.title = `按键 ${KEYS[action.lane].toUpperCase()} - ${(action.time / 1000).toFixed(2)}s`;
+                    note.dataset.time = action.time;
+                    note.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.seekTo(action.time);
+                    });
+                    laneEl.appendChild(note);
+                }
+            }
+        });
+
+        hits.forEach(hit => {
+            if (judgeContent) {
+                const judgeEl = document.createElement('div');
+                let judgeClass = hit.judge;
+                if (hit.judge === 'bad-cut' || hit.judge === 'bad-dodge') {
+                    judgeClass = 'bad';
+                }
+                judgeEl.className = `timeline-judge ${judgeClass}`;
+                const left = (hit.time / duration) * 100;
+                judgeEl.style.left = `calc(${left}% - 5px)`;
+                const judgeText = this.getJudgeLabel(hit.judge);
+                judgeEl.title = `${judgeText} - ${(hit.time / 1000).toFixed(2)}s - 轨道${KEYS[hit.lane].toUpperCase()}`;
+                judgeEl.dataset.time = hit.time;
+                judgeEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.seekTo(hit.time);
+                });
+                judgeContent.appendChild(judgeEl);
+            }
+        });
+
+        notes.forEach(note => {
+            if (note.type === 'bad') {
+                const hit = hits.find(h => h.noteId === note._id);
+                if (dodgeContent) {
+                    const dodgeEl = document.createElement('div');
+                    const isDodged = hit && (hit.judge === 'bad-dodge');
+                    dodgeEl.className = `timeline-dodge ${isDodged ? 'dodged' : 'bad-hit'}`;
+                    const left = (note.time / duration) * 100;
+                    dodgeEl.style.left = `calc(${left}% - 6px)`;
+                    const status = isDodged ? '闪避成功' : '切到坏食材';
+                    dodgeEl.title = `${status} - ${(note.time / 1000).toFixed(2)}s - 轨道${KEYS[note.lane].toUpperCase()}`;
+                    dodgeEl.dataset.time = note.time;
+                    dodgeEl.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.seekTo(note.time);
+                    });
+                    dodgeContent.appendChild(dodgeEl);
+                }
+            }
+        });
+    }
+
+    getJudgeLabel(judge) {
+        const labels = {
+            'perfect': 'PERFECT',
+            'great': 'GREAT',
+            'good': 'GOOD',
+            'miss': 'MISS',
+            'bad-cut': 'BAD CUT',
+            'bad-dodge': 'DODGED'
+        };
+        return labels[judge] || judge;
+    }
+
+    setupTimelineInteractions() {
+        const timeline = document.getElementById('replay-timeline');
+        const track = document.querySelector('.timeline-track');
+        const thumb = document.getElementById('timeline-thumb');
+        const scrollbar = document.getElementById('timeline-scrollbar');
+
+        if (!timeline || !track || !thumb || !scrollbar) return;
+
+        const handleSeek = (clientX) => {
+            const laneContent = document.querySelector('.timeline-lane-content[data-lane="0"]');
+            if (!laneContent) return;
+            const rect = laneContent.getBoundingClientRect();
+            const x = clientX - rect.left;
+            const contentWidth = laneContent.scrollWidth;
+            const percent = Math.max(0, Math.min(1, x / contentWidth));
+            const time = percent * this.timelineDuration;
+            this.seekTo(time);
+        };
+
+        timeline.addEventListener('click', (e) => {
+            if (e.target.closest('.timeline-note') || e.target.closest('.timeline-judge') || e.target.closest('.timeline-dodge') || e.target.closest('.timeline-scrollbar')) {
+                return;
+            }
+            handleSeek(e.clientX);
+        });
+
+        let isDraggingThumb = false;
+        let startX = 0;
+        let startScrollLeft = 0;
+
+        thumb.addEventListener('mousedown', (e) => {
+            isDraggingThumb = true;
+            startX = e.clientX;
+            startScrollLeft = track.scrollLeft;
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDraggingThumb) return;
+            const deltaX = e.clientX - startX;
+            const trackWidth = track.clientWidth;
+            const contentWidth = track.scrollWidth;
+            const maxScroll = contentWidth - trackWidth;
+            const thumbWidth = thumb.offsetWidth;
+            const scrollbarWidth = scrollbar.clientWidth;
+            const scrollPercent = deltaX / (scrollbarWidth - thumbWidth);
+            track.scrollLeft = startScrollLeft + scrollPercent * maxScroll;
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDraggingThumb = false;
+        });
+
+        track.addEventListener('scroll', () => {
+            this.updateThumbPosition();
+        });
+
+        setTimeout(() => this.updateThumbPosition(), 100);
+    }
+
+    updateThumbPosition() {
+        const track = document.querySelector('.timeline-track');
+        const thumb = document.getElementById('timeline-thumb');
+        const scrollbar = document.getElementById('timeline-scrollbar');
+        if (!track || !thumb || !scrollbar) return;
+
+        const contentWidth = track.scrollWidth;
+        const viewWidth = track.clientWidth;
+        const scrollLeft = track.scrollLeft;
+        const maxScroll = contentWidth - viewWidth;
+
+        if (maxScroll <= 0) {
+            thumb.style.width = '100%';
+            thumb.style.left = '0';
+            return;
+        }
+
+        const thumbWidth = Math.max(60, (viewWidth / contentWidth) * scrollbar.clientWidth);
+        const thumbLeft = (scrollLeft / maxScroll) * (scrollbar.clientWidth - thumbWidth);
+
+        thumb.style.width = thumbWidth + 'px';
+        thumb.style.left = thumbLeft + 'px';
+    }
+
+    seekTo(targetTime) {
+        if (!this.replayMode || !this.replay) return;
+        if (!this.timelineSeekable) return;
+
+        targetTime = Math.max(0, Math.min(targetTime, this.timelineDuration));
+
+        const levelId = this.level.id;
+        const replayData = this.replay;
+
+        this.stop();
+
+        this.level = LEVELS.find(l => l.id === levelId);
+        this.notesData = JSON.parse(JSON.stringify(replayData.chart));
+        this.notesData = this.notesData.sort((a, b) => a.time - b.time);
+        this.notesData.forEach((n, i) => n._id = i);
+
+        this.activeNotes = [];
+        this.passedGoodNotes = new Set();
+        this.passedBadNotes = new Set();
+        this.judgedNotes = new Set();
+        this.score = 0;
+        this.combo = 0;
+        this.maxCombo = 0;
+        this.hp = MAX_HP;
+        this.judges = { perfect: 0, great: 0, good: 0, miss: 0, bad: 0 };
+        this.dodgeCount = 0;
+        this.newlyUnlockedAchievements = [];
+        this.replay = replayData;
+        this.currentReplayIndex = 0;
+        this.replayActions = replayData.actions || [];
+        this.recordedActions = [];
+        this.recordedHits = [];
+
+        this.clearVisuals();
+
+        const now = performance.now();
+        this.running = true;
+        this.paused = false;
+        this.pauseOffset = 0;
+        this.startTime = now - targetTime;
+        this.lastFrameTime = now;
+
+        this.simulateToTime(targetTime);
+        this.updateHUD();
+        this.updateLevelInfo();
+
+        this.loop();
+    }
+
+    simulateToTime(targetTime) {
+        const actions = this.replayActions || [];
+        while (this.currentReplayIndex < actions.length &&
+               actions[this.currentReplayIndex].time <= targetTime) {
+            const act = actions[this.currentReplayIndex];
+            this.currentReplayIndex++;
+            if (act.type === 'down') {
+                this.handleKeyDown(act.lane, act.time);
+            }
+        }
+
+        const spawnThreshold = targetTime + NOTE_TRAVEL_TIME;
+        while (this.notesData.length > 0 && this.notesData[0].time <= spawnThreshold) {
+            const note = this.notesData.shift();
+            this.spawnNote(note);
+        }
+
+        for (let i = this.activeNotes.length - 1; i >= 0; i--) {
+            const note = this.activeNotes[i];
+            if (note.removed) continue;
+            const diff = targetTime - note.data.time;
+            if (diff > JUDGE_WINDOWS.miss) {
+                if (note.data.type === 'good') {
+                    this.handleJudge('miss', note, targetTime);
+                } else {
+                    this.handleJudge('bad-dodge', note, targetTime);
+                }
+            }
+        }
+
+        this.activeNotes = this.activeNotes.filter(n => !n.removed);
+    }
+
+    updateTimelinePlayhead(currentTime) {
+        const playhead = document.getElementById('timeline-playhead');
+        const timeDisplay = document.getElementById('replay-time-display');
+        const laneContent = document.querySelector('.timeline-lane-content[data-lane="0"]');
+        const track = document.querySelector('.timeline-track');
+
+        if (!playhead || !timeDisplay || !laneContent || !track) return;
+
+        const duration = this.timelineDuration;
+        const labelWidth = 40;
+        const contentWidth = laneContent.scrollWidth;
+        const percent = Math.min(1, currentTime / duration);
+        const x = labelWidth + percent * contentWidth;
+
+        playhead.style.left = x + 'px';
+
+        const currentSec = (currentTime / 1000).toFixed(2);
+        const totalSec = (duration / 1000).toFixed(2);
+        timeDisplay.textContent = `${currentSec}s / ${totalSec}s`;
+
+        if (this.running && !this.paused) {
+            const trackRect = track.getBoundingClientRect();
+            const playheadRect = playhead.getBoundingClientRect();
+            const playheadRelX = playheadRect.left - trackRect.left;
+            const viewWidth = track.clientWidth;
+
+            if (playheadRelX > viewWidth * 0.7 || playheadRelX < viewWidth * 0.3) {
+                const targetScroll = x - viewWidth * 0.5;
+                track.scrollLeft = Math.max(0, targetScroll);
+            }
+        }
     }
 }
 

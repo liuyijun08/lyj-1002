@@ -303,6 +303,53 @@
             <div id="replay-fx-layer" class="fx-layer"></div>
             <div id="replay-judge-text" class="judge-text"></div>
         </div>
+        <div class="replay-timeline-container">
+            <div class="replay-timeline-header">
+                <span class="timeline-title">📊 操作时间轴</span>
+                <span id="replay-time-display" class="timeline-time">0.00s / 0.00s</span>
+            </div>
+            <div id="replay-timeline" class="replay-timeline">
+                <div class="timeline-track">
+                    <div id="timeline-playhead" class="timeline-playhead"></div>
+                    <div class="timeline-lane timeline-lane-d" data-lane="0">
+                        <span class="timeline-lane-label">D</span>
+                        <div class="timeline-lane-content" data-lane="0"></div>
+                    </div>
+                    <div class="timeline-lane timeline-lane-f" data-lane="1">
+                        <span class="timeline-lane-label">F</span>
+                        <div class="timeline-lane-content" data-lane="1"></div>
+                    </div>
+                    <div class="timeline-lane timeline-lane-j" data-lane="2">
+                        <span class="timeline-lane-label">J</span>
+                        <div class="timeline-lane-content" data-lane="2"></div>
+                    </div>
+                    <div class="timeline-lane timeline-lane-k" data-lane="3">
+                        <span class="timeline-lane-label">K</span>
+                        <div class="timeline-lane-content" data-lane="3"></div>
+                    </div>
+                    <div class="timeline-lane timeline-lane-judge">
+                        <span class="timeline-lane-label">判定</span>
+                        <div class="timeline-lane-content timeline-judge-content"></div>
+                    </div>
+                    <div class="timeline-lane timeline-lane-dodge">
+                        <span class="timeline-lane-label">闪避</span>
+                        <div class="timeline-lane-content timeline-dodge-content"></div>
+                    </div>
+                </div>
+                <div id="timeline-scrollbar" class="timeline-scrollbar">
+                    <div id="timeline-thumb" class="timeline-thumb"></div>
+                </div>
+            </div>
+            <div class="replay-timeline-legend">
+                <span class="legend-item"><span class="legend-dot key-press"></span>按键</span>
+                <span class="legend-item"><span class="legend-dot perfect-bg"></span>Perfect</span>
+                <span class="legend-item"><span class="legend-dot great-bg"></span>Great</span>
+                <span class="legend-item"><span class="legend-dot good-bg"></span>Good</span>
+                <span class="legend-item"><span class="legend-dot miss-bg"></span>Miss</span>
+                <span class="legend-item"><span class="legend-dot bad-bg"></span>切到坏食材</span>
+                <span class="legend-item"><span class="legend-dot dodge-bg"></span>闪避成功</span>
+            </div>
+        </div>
     </div>
 </div>
 <script src="game.js"></script>
