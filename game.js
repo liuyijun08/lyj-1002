@@ -19,11 +19,13 @@ const SCORE_VALUES = {
 };
 
 const COMBO_BONUS_STEP = 10;
+const COMBO_BONUS_PER_STEP = 0.1;
 const MAX_COMBO_BONUS = 1.5;
 
 const MAX_HP = 100;
 const HP_DAMAGE_MISS = 10;
 const HP_DAMAGE_BAD = 15;
+const HP_DAMAGE_EMPTY = 5;
 const HP_HEAL_PERFECT = 2;
 
 const NOTE_TRAVEL_TIME = 2000; // ms, 音符从顶落到底的时间
@@ -303,7 +305,11 @@ class GameEngine {
 
     start(levelId, replayData = null) {
         this.level = LEVELS.find(l => l.id === levelId);
-        this.notesData = JSON.parse(JSON.stringify(this.level.data.notes));
+        if (replayData && replayData.chart) {
+            this.notesData = JSON.parse(JSON.stringify(replayData.chart));
+        } else {
+            this.notesData = JSON.parse(JSON.stringify(this.level.data.notes));
+        }
         this.notesData = this.notesData.sort((a, b) => a.time - b.time);
         this.notesData.forEach((n, i) => n._id = i);
 
@@ -536,7 +542,11 @@ class GameEngine {
         }
 
         if (!closest) {
-            // 空按：无音符时按键，给予小惩罚但不判定
+            if (!this.replayMode) {
+                this.combo = 0;
+                this.hp -= HP_DAMAGE_EMPTY;
+                this.showJudge('MISS', 'miss');
+            }
             return;
         }
 
@@ -568,8 +578,11 @@ class GameEngine {
             case 'perfect':
                 this.combo++;
                 this.maxCombo = Math.max(this.maxCombo, this.combo);
-                const bonusPerfect = 1 + Math.min(this.combo / COMBO_BONUS_STEP, MAX_COMBO_BONUS - 1) * 0.1;
-                this.score += SCORE_VALUES.perfect * bonusPerfect;
+                {
+                    const steps = Math.floor(this.combo / COMBO_BONUS_STEP);
+                    const bonusPerfect = 1 + Math.min(steps * COMBO_BONUS_PER_STEP, MAX_COMBO_BONUS - 1);
+                    this.score += SCORE_VALUES.perfect * bonusPerfect;
+                }
                 this.judges.perfect++;
                 this.hp = Math.min(MAX_HP, this.hp + HP_HEAL_PERFECT);
                 this.showJudge('PERFECT', 'perfect');
@@ -578,8 +591,11 @@ class GameEngine {
             case 'great':
                 this.combo++;
                 this.maxCombo = Math.max(this.maxCombo, this.combo);
-                const bonusGreat = 1 + Math.min(this.combo / COMBO_BONUS_STEP, MAX_COMBO_BONUS - 1) * 0.1;
-                this.score += SCORE_VALUES.great * bonusGreat;
+                {
+                    const steps = Math.floor(this.combo / COMBO_BONUS_STEP);
+                    const bonusGreat = 1 + Math.min(steps * COMBO_BONUS_PER_STEP, MAX_COMBO_BONUS - 1);
+                    this.score += SCORE_VALUES.great * bonusGreat;
+                }
                 this.judges.great++;
                 this.showJudge('GREAT', 'great');
                 this.showHitFx(note.data.lane, 'great');
@@ -587,8 +603,11 @@ class GameEngine {
             case 'good':
                 this.combo++;
                 this.maxCombo = Math.max(this.maxCombo, this.combo);
-                const bonusGood = 1 + Math.min(this.combo / COMBO_BONUS_STEP, MAX_COMBO_BONUS - 1) * 0.1;
-                this.score += SCORE_VALUES.good * bonusGood;
+                {
+                    const steps = Math.floor(this.combo / COMBO_BONUS_STEP);
+                    const bonusGood = 1 + Math.min(steps * COMBO_BONUS_PER_STEP, MAX_COMBO_BONUS - 1);
+                    this.score += SCORE_VALUES.good * bonusGood;
+                }
                 this.judges.good++;
                 this.showJudge('GOOD', 'good');
                 this.showHitFx(note.data.lane, 'good');
@@ -652,6 +671,7 @@ class GameEngine {
         return {
             levelId: this.level.id,
             duration: this.getCurrentTime(),
+            chart: JSON.parse(JSON.stringify(this.level.data.notes)),
             actions: this.recordedActions,
             hits: this.recordedHits,
             finalScore: Math.floor(this.score),
@@ -666,9 +686,14 @@ class GameEngine {
 let game = null;
 let replayGame = null;
 
+let _levelDataLoaded = false;
+
 // ==================== 开始关卡 ====================
 function startLevel(levelId) {
-    loadLevelData();
+    if (!_levelDataLoaded) {
+        loadLevelData();
+        _levelDataLoaded = true;
+    }
     game = new GameEngine(false);
     showScreen('game');
     game.start(levelId);
@@ -748,7 +773,10 @@ function watchReplay(levelId) {
         alert('没有可用的回放记录！');
         return;
     }
-    loadLevelData();
+    if (!_levelDataLoaded) {
+        loadLevelData();
+        _levelDataLoaded = true;
+    }
     replayGame = new GameEngine(true);
     document.getElementById('replay-watching').classList.remove('hidden-overlay');
     document.getElementById('replay-watching').classList.add('active');
@@ -814,7 +842,10 @@ function quitToLevelSelect() {
 
 // ==================== 初始化 ====================
 function init() {
-    loadLevelData();
+    if (!_levelDataLoaded) {
+        loadLevelData();
+        _levelDataLoaded = true;
+    }
 
     // 菜单按钮
     document.getElementById('btn-start').addEventListener('click', () => {
