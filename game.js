@@ -402,12 +402,18 @@ function updateLevelBestRank(levelId, rank, accuracy, hp) {
     const rankOrder = { F: 0, C: 1, B: 2, A: 3, S: 4 };
     const prevRankOrder = prev ? (rankOrder[prev.rank] || 0) : -1;
     const newRankOrder = rankOrder[rank] || 0;
-    if (!prev || newRankOrder > prevRankOrder ||
-        (newRankOrder === prevRankOrder && accuracy > (prev.accuracy || 0))) {
+    const accuracyPercent = Math.round(accuracy * 10000) / 100;
+    const hpRounded = Math.round(hp);
+    const isBetterRank = newRankOrder > prevRankOrder;
+    const isSameRankBetterAcc = newRankOrder === prevRankOrder && accuracyPercent > (prev.accuracy || 0);
+    const isSameRankSameAccBetterHp = newRankOrder === prevRankOrder
+        && Math.abs(accuracyPercent - (prev.accuracy || 0)) < 0.01
+        && hpRounded > (prev.hp || 0);
+    if (!prev || isBetterRank || isSameRankBetterAcc || isSameRankSameAccBetterHp) {
         save.levelBestRanks[levelId] = {
             rank,
-            accuracy: Math.round(accuracy * 10000) / 100,
-            hp: Math.round(hp),
+            accuracy: accuracyPercent,
+            hp: hpRounded,
             updatedAt: Date.now()
         };
         saveData(save);
@@ -553,17 +559,24 @@ function getAchievementProgressHTML(ach, save) {
         const levelId = condition.level;
         const best = save.levelBestRanks && save.levelBestRanks[levelId];
         if (best) {
-            current = best.rank === 'S' ? 100 : Math.floor((best.accuracy / 95) * 100);
-            current = Math.min(current, 99);
-            const accDiff = Math.max(0, 95 - best.accuracy);
-            const hpDiff = Math.max(0, 50 - best.hp);
-            const diffs = [];
-            if (accDiff > 0) diffs.push(`准确率差 ${accDiff.toFixed(1)}%`);
-            if (hpDiff > 0) diffs.push(`生命差 ${hpDiff}`);
-            diffText = diffs.length > 0 ? diffs.join('，') : '已达成S级条件！';
-            if (best.rank === 'S') {
+            const S_ACC_TARGET = 95;
+            const S_HP_TARGET = 51;
+            const accProgress = Math.min(100, (best.accuracy / S_ACC_TARGET) * 100);
+            const hpProgress = Math.min(100, (best.hp / S_HP_TARGET) * 100);
+            const accSatisfied = best.accuracy >= S_ACC_TARGET;
+            const hpSatisfied = best.hp >= S_HP_TARGET;
+            if (best.rank === 'S' || (accSatisfied && hpSatisfied)) {
                 current = 100;
                 diffText = '已达成S级！';
+            } else {
+                current = Math.floor(Math.min(accProgress, hpProgress));
+                current = Math.min(current, 99);
+                const accDiff = Math.max(0, S_ACC_TARGET - best.accuracy);
+                const hpDiff = Math.max(0, S_HP_TARGET - best.hp);
+                const diffs = [];
+                if (accDiff > 0) diffs.push(`准确率差 ${accDiff.toFixed(1)}%`);
+                if (hpDiff > 0) diffs.push(`生命差 ${hpDiff}`);
+                diffText = diffs.length > 0 ? diffs.join('，') : '已达成S级条件！';
             }
         } else {
             current = 0;
