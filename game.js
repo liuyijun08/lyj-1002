@@ -865,10 +865,6 @@ function renderInventoryList() {
             <div class="inv-card-price">¥${ing.price}/${ing.unit}</div>
             <button class="btn btn-small btn-restock" data-id="${ing.id}">补货</button>
         `;
-        card.querySelector('.btn-restock').addEventListener('click', (e) => {
-            e.stopPropagation();
-            showRestockDialog(ing.id);
-        });
         listEl.appendChild(card);
     });
 }
@@ -891,7 +887,7 @@ function showRestockDialog(ingredientId) {
     updateRestockTotal();
     const save = getSaveData();
     document.getElementById('restock-balance').textContent = '¥' + (save.totalIncome || 0).toLocaleString();
-    document.getElementById('restock-dialog').style.display = 'flex';
+    document.getElementById('restock-dialog').classList.add('active');
 }
 
 function updateRestockTotal() {
@@ -902,7 +898,7 @@ function updateRestockTotal() {
 }
 
 function dismissRestockDialog() {
-    document.getElementById('restock-dialog').style.display = 'none';
+    document.getElementById('restock-dialog').classList.remove('active');
     pendingRestockIngredientId = null;
 }
 
@@ -1234,20 +1230,8 @@ function renderTitlesList() {
         else if (unlocked) cls += ' available';
         else cls += ' locked';
         badge.className = cls;
+        badge.dataset.achId = ach.id;
         badge.textContent = unlocked ? ach.title : '???';
-        if (unlocked) {
-            badge.addEventListener('click', () => {
-                if (equipped) {
-                    unequipTitle();
-                } else {
-                    equipTitle(ach.id);
-                }
-                renderTitlesList();
-                updateUnequipButton();
-                const currentTitle = getEquippedTitle();
-                document.getElementById('ach-current-title').textContent = currentTitle || '无';
-            });
-        }
         listEl.appendChild(badge);
     });
 }
@@ -1271,16 +1255,421 @@ function updateMenuTitle() {
     }
 }
 
-// ==================== 屏幕切换 ====================
-function showScreen(id) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    if (id === 'level-select') renderLevelSelect();
-    if (id === 'achievements') renderAchievementsPage();
-    if (id === 'inventory') renderInventoryPage();
-    if (id === 'review-wall') renderReviewWall();
-    if (id === 'chef-schedule') renderChefSchedule();
-    if (id === 'menu') updateMenuTitle();
+// ==================== 页面管理器 (PageManager) ====================
+const PageManager = (function () {
+    const PAGES = {
+        menu: {
+            id: 'menu',
+            name: '主菜单',
+            onEnter: updateMenuTitle
+        },
+        'level-select': {
+            id: 'level-select',
+            name: '接单中心',
+            onEnter: renderLevelSelect
+        },
+        inventory: {
+            id: 'inventory',
+            name: '库存页',
+            onEnter: renderInventoryPage
+        },
+        achievements: {
+            id: 'achievements',
+            name: '成就墙',
+            onEnter: renderAchievementsPage
+        },
+        'review-wall': {
+            id: 'review-wall',
+            name: '评价墙',
+            onEnter: renderReviewWall
+        },
+        'chef-schedule': {
+            id: 'chef-schedule',
+            name: '厨师排班',
+            onEnter: renderChefSchedule
+        },
+        howto: {
+            id: 'howto',
+            name: '操作说明'
+        },
+        game: {
+            id: 'game',
+            name: '游戏'
+        },
+        pause: {
+            id: 'pause',
+            name: '暂停'
+        },
+        result: {
+            id: 'result',
+            name: '结算'
+        },
+        'restock-dialog': {
+            id: 'restock-dialog',
+            name: '补货弹窗'
+        },
+        'order-confirm': {
+            id: 'order-confirm',
+            name: '接单确认弹窗'
+        },
+        'confirm-overlay': {
+            id: 'confirm-overlay',
+            name: '通用确认弹窗'
+        },
+        'level-hint-overlay': {
+            id: 'level-hint-overlay',
+            name: '关卡提示弹窗'
+        },
+        'replay-watching': {
+            id: 'replay-watching',
+            name: '回放'
+        }
+    };
+
+    let currentPageId = 'menu';
+
+    function navigate(pageId, params) {
+        const page = PAGES[pageId];
+        if (!page) {
+            console.warn('[PageManager] 未知页面:', pageId);
+            return;
+        }
+
+        const isOverlay = pageId.includes('dialog') ||
+                          pageId.includes('overlay') ||
+                          pageId === 'pause' ||
+                          pageId === 'result' ||
+                          pageId === 'replay-watching';
+
+        if (!isOverlay) {
+            document.querySelectorAll('.screen:not(.overlay)').forEach(s => s.classList.remove('active'));
+        }
+        const targetEl = document.getElementById(pageId);
+        if (!targetEl) {
+            console.warn('[PageManager] 找不到页面元素:', pageId);
+            return;
+        }
+        targetEl.classList.add('active');
+        currentPageId = pageId;
+
+        if (typeof page.onEnter === 'function') {
+            try {
+                page.onEnter(params);
+            } catch (e) {
+                console.error('[PageManager] 页面渲染出错:', pageId, e);
+            }
+        }
+    }
+
+    function register(pageId, config) {
+        PAGES[pageId] = Object.assign({ id: pageId }, config);
+    }
+
+    function getCurrentPage() {
+        return currentPageId;
+    }
+
+    function hasPage(pageId) {
+        return !!PAGES[pageId];
+    }
+
+    return {
+        navigate,
+        register,
+        getCurrentPage,
+        hasPage,
+        PAGES: Object.freeze(Object.assign({}, PAGES))
+    };
+})();
+
+window.showScreen = PageManager.navigate;
+
+// ==================== 事件管理器 (EventManager) ====================
+const EventManager = (function () {
+    const STATIC_BINDINGS = [
+        { id: 'btn-start', event: 'click', handler: () => PageManager.navigate('level-select') },
+        { id: 'btn-howto', event: 'click', handler: () => PageManager.navigate('howto') },
+        { id: 'btn-achievements', event: 'click', handler: () => PageManager.navigate('achievements') },
+        { id: 'btn-inventory', event: 'click', handler: () => PageManager.navigate('inventory') },
+        { id: 'btn-chef-schedule', event: 'click', handler: () => PageManager.navigate('chef-schedule') },
+        { id: 'btn-rest-chef', event: 'click', handler: restAllChefs },
+        { id: 'btn-review-wall', event: 'click', handler: () => PageManager.navigate('review-wall') },
+        { id: 'btn-restock-all', event: 'click', handler: handleRestockAll },
+        { id: 'btn-cancel-restock', event: 'click', handler: dismissRestockDialog },
+        { id: 'btn-confirm-restock', event: 'click', handler: confirmRestock },
+        { id: 'qty-minus', event: 'click', handler: handleQtyMinus },
+        { id: 'qty-plus', event: 'click', handler: handleQtyPlus },
+        { id: 'restock-quantity', event: 'change', handler: handleQtyChange },
+        { id: 'btn-cancel-order', event: 'click', handler: dismissOrderConfirm },
+        { id: 'btn-accept-order', event: 'click', handler: acceptPendingOrder },
+        { id: 'btn-unequip-title', event: 'click', handler: handleUnequipTitle },
+        { id: 'btn-pause', event: 'click', handler: pauseGame },
+        { id: 'btn-resume', event: 'click', handler: resumeGame },
+        { id: 'btn-quit', event: 'click', handler: handleQuitGame },
+        { id: 'btn-restart', event: 'click', handler: handleRestartGame },
+        { id: 'btn-confirm-ok', event: 'click', handler: handleConfirmOk },
+        { id: 'btn-confirm-cancel', event: 'click', handler: dismissConfirmDialog },
+        { id: 'btn-replay-menu', event: 'click', handler: handleReplayMenu },
+        { id: 'btn-retry', event: 'click', handler: handleRetry },
+        { id: 'btn-watch-replay', event: 'click', handler: handleWatchReplay },
+        { id: 'btn-next-level', event: 'click', handler: handleNextLevel },
+        { id: 'btn-back-levels', event: 'click', handler: handleBackLevels },
+        { id: 'hint-dismiss-btn', event: 'click', handler: dismissLevelHint },
+        { id: 'btn-exit-replay', event: 'click', handler: exitReplay }
+    ];
+
+    const DELEGATED_BINDINGS = [
+        {
+            selector: '.chef-assign-btn',
+            event: 'click',
+            handler: (e, target) => {
+                const chefId = target.dataset.chefId;
+                if (chefId) toggleChefAssignment(chefId);
+            }
+        },
+        {
+            selector: '.chef-rest-btn',
+            event: 'click',
+            handler: (e, target) => {
+                const chefId = target.dataset.chefId;
+                if (chefId) restChef(chefId);
+            }
+        },
+        {
+            selector: '.btn-restock',
+            event: 'click',
+            handler: (e, target) => {
+                e.stopPropagation();
+                const id = target.dataset.id;
+                if (id) showRestockDialog(id);
+            }
+        },
+        {
+            selector: '.accept-order-btn',
+            event: 'click',
+            handler: (e, target) => {
+                e.stopPropagation();
+                const levelId = parseInt(target.dataset.levelId, 10);
+                if (!isNaN(levelId)) showOrderConfirm(levelId);
+            }
+        },
+        {
+            selector: '.order-card:not(.locked)',
+            event: 'click',
+            handler: (e, target) => {
+                const levelId = parseInt(target.dataset.levelId, 10);
+                if (!isNaN(levelId)) showOrderConfirm(levelId);
+            }
+        },
+        {
+            selector: '.title-badge.available, .title-badge.equipped',
+            event: 'click',
+            handler: (e, target) => {
+                const achId = target.dataset.achId;
+                if (!achId) return;
+                const equipped = target.classList.contains('equipped');
+                if (equipped) {
+                    unequipTitle();
+                } else {
+                    equipTitle(achId);
+                }
+                renderTitlesList();
+                updateUnequipButton();
+                const currentTitle = getEquippedTitle();
+                document.getElementById('ach-current-title').textContent = currentTitle || '无';
+            }
+        },
+        {
+            selector: '.review-tab',
+            event: 'click',
+            handler: (e, target) => {
+                document.querySelectorAll('.review-tab').forEach(t => t.classList.remove('active'));
+                target.classList.add('active');
+                currentReviewFilter = target.dataset.filter;
+                renderReviewWall();
+            }
+        },
+        {
+            selector: '.inv-tab',
+            event: 'click',
+            handler: (e, target) => {
+                document.querySelectorAll('.inv-tab').forEach(t => t.classList.remove('active'));
+                target.classList.add('active');
+                currentInvCategory = target.dataset.category;
+                renderInventoryList();
+            }
+        },
+        {
+            selector: '.ach-tab',
+            event: 'click',
+            handler: (e, target) => {
+                document.querySelectorAll('.ach-tab').forEach(t => t.classList.remove('active'));
+                target.classList.add('active');
+                currentAchCategory = target.dataset.category;
+                renderAchievementsList();
+            }
+        },
+        {
+            selector: '[data-navigate]',
+            event: 'click',
+            handler: (e, target) => {
+                const pageId = target.dataset.navigate;
+                if (pageId) PageManager.navigate(pageId);
+            }
+        }
+    ];
+
+    function bindAll() {
+        STATIC_BINDINGS.forEach(binding => {
+            const el = document.getElementById(binding.id);
+            if (!el) return;
+            el.removeEventListener(binding.event, binding._handler);
+            binding._handler = binding.handler;
+            el.addEventListener(binding.event, binding._handler);
+        });
+
+        DELEGATED_BINDINGS.forEach(binding => {
+            document.removeEventListener(binding.event, binding._handler);
+            binding._handler = function (e) {
+                const target = e.target.closest(binding.selector);
+                if (target) binding.handler(e, target);
+            };
+            document.addEventListener(binding.event, binding._handler);
+        });
+    }
+
+    function addStatic(binding) {
+        STATIC_BINDINGS.push(binding);
+        const el = document.getElementById(binding.id);
+        if (el) el.addEventListener(binding.event, binding.handler);
+    }
+
+    function addDelegated(binding) {
+        DELEGATED_BINDINGS.push(binding);
+        const handler = function (e) {
+            const target = e.target.closest(binding.selector);
+            if (target) binding.handler(e, target);
+        };
+        document.addEventListener(binding.event, handler);
+        binding._handler = handler;
+    }
+
+    return {
+        bindAll,
+        addStatic,
+        addDelegated,
+        STATIC_BINDINGS: Object.freeze(STATIC_BINDINGS.slice()),
+        DELEGATED_BINDINGS: Object.freeze(DELEGATED_BINDINGS.slice())
+    };
+})();
+
+function handleRestockAll() {
+    const result = restockAll(20);
+    if (result.success) {
+        renderInventoryPage();
+        showToast(`✅ 一键补货成功！共花费 ¥${result.totalCost.toLocaleString()}`);
+    } else {
+        showToast(`❌ ${result.reason}！需要 ¥${result.totalCost.toLocaleString()}，当前 ¥${result.currentBalance.toLocaleString()}`);
+    }
+}
+
+function handleQtyMinus() {
+    pendingRestockQuantity = Math.max(1, pendingRestockQuantity - 1);
+    document.getElementById('restock-quantity').value = pendingRestockQuantity;
+    updateRestockTotal();
+}
+
+function handleQtyPlus() {
+    pendingRestockQuantity = Math.min(999, pendingRestockQuantity + 1);
+    document.getElementById('restock-quantity').value = pendingRestockQuantity;
+    updateRestockTotal();
+}
+
+function handleQtyChange(e) {
+    const val = parseInt(e.target.value, 10);
+    pendingRestockQuantity = Math.max(1, Math.min(999, isNaN(val) ? 1 : val));
+    e.target.value = pendingRestockQuantity;
+    updateRestockTotal();
+}
+
+function handleUnequipTitle() {
+    unequipTitle();
+    renderTitlesList();
+    updateUnequipButton();
+    document.getElementById('ach-current-title').textContent = '无';
+}
+
+function handleQuitGame() {
+    if (!game) return;
+    const curScore = Math.floor(game.score).toLocaleString();
+    showConfirmDialog(
+        '确认退出？',
+        `当前收入：<strong style="font-size:20px;">¥${curScore}</strong><br><br>退出订单后，<strong>本局未完成的收入和临时记录将会丢失</strong><br><span style="color:#888;font-size:14px;">（已保存的历史回放不会受影响）</span><br><br>确定取消这单吗？`,
+        quitToLevelSelect
+    );
+}
+
+function handleRestartGame() {
+    if (!game) return;
+    const curScore = Math.floor(game.score).toLocaleString();
+    showConfirmDialog(
+        '确认重新开始？',
+        `当前收入：<strong style="font-size:20px;">¥${curScore}</strong><br><br>重新接单后，<strong>本局未完成的收入和临时记录将会丢失</strong><br><span style="color:#888;font-size:14px;">（已保存的历史回放不会受影响）</span><br><br>确定重来吗？`,
+        restartLevel
+    );
+}
+
+function handleConfirmOk() {
+    if (_pendingConfirmAction) _pendingConfirmAction();
+}
+
+function handleReplayMenu() {
+    if (!game) return;
+    const levelId = game.level.id;
+    game.stop();
+    document.getElementById('pause').classList.remove('active');
+    watchReplay(levelId);
+}
+
+function _clearNextLevelAnim() {
+    const btnNext = document.getElementById('btn-next-level');
+    btnNext.classList.remove('btn-unlock-anim');
+    btnNext.querySelectorAll('.btn-sparkle').forEach(el => el.remove());
+}
+
+function handleRetry() {
+    dismissLevelHint();
+    _clearNextLevelAnim();
+    const levelId = game ? game.level.id : 1;
+    startLevel(levelId);
+}
+
+function handleWatchReplay() {
+    if (!game) return;
+    dismissLevelHint();
+    _clearNextLevelAnim();
+    const levelId = game.level.id;
+    document.getElementById('result').classList.remove('active');
+    watchReplay(levelId);
+}
+
+function handleNextLevel() {
+    if (!game) return;
+    dismissLevelHint();
+    _clearNextLevelAnim();
+    const nextId = game.level.id + 1;
+    if (LEVELS.find(l => l.id === nextId)) {
+        startLevel(nextId);
+    } else {
+        quitToLevelSelect();
+    }
+}
+
+function handleBackLevels() {
+    dismissLevelHint();
+    _clearNextLevelAnim();
+    document.getElementById('result').classList.remove('active');
+    PageManager.navigate('level-select');
 }
 
 // ==================== 厨师排班系统 ====================
@@ -1347,20 +1736,6 @@ function renderChefSchedule() {
         `;
 
         container.appendChild(card);
-    });
-
-    container.querySelectorAll('.chef-assign-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const chefId = btn.dataset.chefId;
-            toggleChefAssignment(chefId);
-        });
-    });
-
-    container.querySelectorAll('.chef-rest-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const chefId = btn.dataset.chefId;
-            restChef(chefId);
-        });
     });
 }
 
@@ -1453,6 +1828,7 @@ function renderLevelSelect() {
         const stars = save.levelStars[lvl.id] || 0;
         const card = document.createElement('div');
         card.className = 'order-card' + (unlocked ? '' : ' locked');
+        card.dataset.levelId = lvl.id;
 
         const starsHTML = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
         const timeLimitStr = formatTime(lvl.timeLimit);
@@ -1486,18 +1862,8 @@ function renderLevelSelect() {
                 <span class="order-stars">${starsHTML}</span>
             </div>
             ${best > 0 ? `<div class="best-income">💵 最高 ¥${best.toLocaleString()}</div>` : ''}
-            ${!unlocked ? '<div class="locked-icon">🔒</div><div class="order-locked-text">完成上一单解锁</div>' : '<button class="accept-order-btn">🚀 接单</button>'}
+            ${!unlocked ? '<div class="locked-icon">🔒</div><div class="order-locked-text">完成上一单解锁</div>' : `<button class="accept-order-btn" data-level-id="${lvl.id}">🚀 接单</button>`}
         `;
-        if (unlocked) {
-            const btn = card.querySelector('.accept-order-btn');
-            if (btn) {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    showOrderConfirm(lvl.id);
-                });
-            }
-            card.addEventListener('click', () => showOrderConfirm(lvl.id));
-        }
         list.appendChild(card);
     });
 
@@ -1559,11 +1925,11 @@ function showOrderConfirm(levelId) {
         chefSection.style.display = 'none';
     }
 
-    document.getElementById('order-confirm').style.display = 'flex';
+    document.getElementById('order-confirm').classList.add('active');
 }
 
 function dismissOrderConfirm() {
-    document.getElementById('order-confirm').style.display = 'none';
+    document.getElementById('order-confirm').classList.remove('active');
     pendingOrderLevelId = null;
 }
 
@@ -2936,7 +3302,7 @@ document.addEventListener('keydown', (e) => {
     }
     if (key === 'escape') {
         const confirmEl = document.getElementById('confirm-overlay');
-        if (confirmEl.style.display !== 'none') {
+        if (confirmEl.classList.contains('active')) {
             dismissConfirmDialog();
         } else if (game && game.running && !game.paused && !game.replayMode) {
             pauseGame();
@@ -2970,7 +3336,7 @@ function quitToLevelSelect() {
     if (game) game.stop();
     game = null;
     document.getElementById('pause').classList.remove('active');
-    document.getElementById('confirm-overlay').style.display = 'none';
+    document.getElementById('confirm-overlay').classList.remove('active');
     showScreen('level-select');
 }
 
@@ -2980,12 +3346,12 @@ function showConfirmDialog(title, message, action) {
     _pendingConfirmAction = action;
     document.getElementById('confirm-title').textContent = title;
     document.getElementById('confirm-message').innerHTML = message;
-    document.getElementById('confirm-overlay').style.display = 'flex';
+    document.getElementById('confirm-overlay').classList.add('active');
 }
 
 function dismissConfirmDialog() {
     _pendingConfirmAction = null;
-    document.getElementById('confirm-overlay').style.display = 'none';
+    document.getElementById('confirm-overlay').classList.remove('active');
 }
 
 function restartLevel() {
@@ -2994,7 +3360,7 @@ function restartLevel() {
     game.stop();
     game = null;
     document.getElementById('pause').classList.remove('active');
-    document.getElementById('confirm-overlay').style.display = 'none';
+    document.getElementById('confirm-overlay').classList.remove('active');
     startLevel(levelId);
 }
 
@@ -3007,179 +3373,7 @@ function init() {
 
     checkURLVerification();
 
-    document.getElementById('btn-start').addEventListener('click', () => {
-        showScreen('level-select');
-    });
-    document.getElementById('btn-howto').addEventListener('click', () => {
-        showScreen('howto');
-    });
-    document.getElementById('btn-achievements').addEventListener('click', () => {
-        showScreen('achievements');
-    });
-    document.getElementById('btn-inventory').addEventListener('click', () => {
-        showScreen('inventory');
-    });
-    document.getElementById('btn-chef-schedule').addEventListener('click', () => {
-        showScreen('chef-schedule');
-    });
-
-    const btnRestChef = document.getElementById('btn-rest-chef');
-    if (btnRestChef) {
-        btnRestChef.addEventListener('click', restAllChefs);
-    }
-
-    const btnReviewWall = document.getElementById('btn-review-wall');
-    if (btnReviewWall) {
-        btnReviewWall.addEventListener('click', () => {
-            showScreen('review-wall');
-        });
-    }
-
-    document.querySelectorAll('.review-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.review-tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            currentReviewFilter = tab.dataset.filter;
-            renderReviewWall();
-        });
-    });
-
-    document.querySelectorAll('.inv-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.inv-tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            currentInvCategory = tab.dataset.category;
-            renderInventoryList();
-        });
-    });
-
-    document.getElementById('btn-restock-all').addEventListener('click', () => {
-        const result = restockAll(20);
-        if (result.success) {
-            renderInventoryPage();
-            showToast(`✅ 一键补货成功！共花费 ¥${result.totalCost.toLocaleString()}`);
-        } else {
-            showToast(`❌ ${result.reason}！需要 ¥${result.totalCost.toLocaleString()}，当前 ¥${result.currentBalance.toLocaleString()}`);
-        }
-    });
-
-    document.getElementById('btn-cancel-restock').addEventListener('click', dismissRestockDialog);
-    document.getElementById('btn-confirm-restock').addEventListener('click', confirmRestock);
-
-    document.getElementById('qty-minus').addEventListener('click', () => {
-        pendingRestockQuantity = Math.max(1, pendingRestockQuantity - 1);
-        document.getElementById('restock-quantity').value = pendingRestockQuantity;
-        updateRestockTotal();
-    });
-    document.getElementById('qty-plus').addEventListener('click', () => {
-        pendingRestockQuantity = Math.min(999, pendingRestockQuantity + 1);
-        document.getElementById('restock-quantity').value = pendingRestockQuantity;
-        updateRestockTotal();
-    });
-    document.getElementById('restock-quantity').addEventListener('change', (e) => {
-        const val = parseInt(e.target.value, 10);
-        pendingRestockQuantity = Math.max(1, Math.min(999, isNaN(val) ? 1 : val));
-        e.target.value = pendingRestockQuantity;
-        updateRestockTotal();
-    });
-
-    document.getElementById('btn-cancel-order').addEventListener('click', dismissOrderConfirm);
-    document.getElementById('btn-accept-order').addEventListener('click', acceptPendingOrder);
-
-    document.querySelectorAll('.ach-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.ach-tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            currentAchCategory = tab.dataset.category;
-            renderAchievementsList();
-        });
-    });
-
-    const unequipBtn = document.getElementById('btn-unequip-title');
-    if (unequipBtn) {
-        unequipBtn.addEventListener('click', () => {
-            unequipTitle();
-            renderTitlesList();
-            updateUnequipButton();
-            document.getElementById('ach-current-title').textContent = '无';
-        });
-    }
-
-    document.getElementById('btn-pause').addEventListener('click', pauseGame);
-    document.getElementById('btn-resume').addEventListener('click', resumeGame);
-    document.getElementById('btn-quit').addEventListener('click', () => {
-        if (!game) return;
-        const curScore = Math.floor(game.score).toLocaleString();
-        showConfirmDialog(
-            '确认退出？',
-            `当前收入：<strong style="font-size:20px;">¥${curScore}</strong><br><br>退出订单后，<strong>本局未完成的收入和临时记录将会丢失</strong><br><span style="color:#888;font-size:14px;">（已保存的历史回放不会受影响）</span><br><br>确定取消这单吗？`,
-            quitToLevelSelect
-        );
-    });
-    document.getElementById('btn-restart').addEventListener('click', () => {
-        if (!game) return;
-        const curScore = Math.floor(game.score).toLocaleString();
-        showConfirmDialog(
-            '确认重新开始？',
-            `当前收入：<strong style="font-size:20px;">¥${curScore}</strong><br><br>重新接单后，<strong>本局未完成的收入和临时记录将会丢失</strong><br><span style="color:#888;font-size:14px;">（已保存的历史回放不会受影响）</span><br><br>确定重来吗？`,
-            restartLevel
-        );
-    });
-    document.getElementById('btn-confirm-ok').addEventListener('click', () => {
-        if (_pendingConfirmAction) _pendingConfirmAction();
-    });
-    document.getElementById('btn-confirm-cancel').addEventListener('click', dismissConfirmDialog);
-    document.getElementById('btn-replay-menu').addEventListener('click', () => {
-        if (!game) return;
-        const levelId = game.level.id;
-        game.stop();
-        document.getElementById('pause').classList.remove('active');
-        watchReplay(levelId);
-    });
-
-    document.getElementById('btn-retry').addEventListener('click', () => {
-        dismissLevelHint();
-        const btnNext = document.getElementById('btn-next-level');
-        btnNext.classList.remove('btn-unlock-anim');
-        btnNext.querySelectorAll('.btn-sparkle').forEach(el => el.remove());
-        const levelId = game ? game.level.id : 1;
-        startLevel(levelId);
-    });
-    document.getElementById('btn-watch-replay').addEventListener('click', () => {
-        if (!game) return;
-        dismissLevelHint();
-        const btnNext = document.getElementById('btn-next-level');
-        btnNext.classList.remove('btn-unlock-anim');
-        btnNext.querySelectorAll('.btn-sparkle').forEach(el => el.remove());
-        const levelId = game.level.id;
-        document.getElementById('result').classList.remove('active');
-        watchReplay(levelId);
-    });
-    document.getElementById('btn-next-level').addEventListener('click', () => {
-        if (!game) return;
-        dismissLevelHint();
-        const btnNext = document.getElementById('btn-next-level');
-        btnNext.classList.remove('btn-unlock-anim');
-        btnNext.querySelectorAll('.btn-sparkle').forEach(el => el.remove());
-        const nextId = game.level.id + 1;
-        if (LEVELS.find(l => l.id === nextId)) {
-            startLevel(nextId);
-        } else {
-            quitToLevelSelect();
-        }
-    });
-    document.getElementById('btn-back-levels').addEventListener('click', () => {
-        dismissLevelHint();
-        const btnNext = document.getElementById('btn-next-level');
-        btnNext.classList.remove('btn-unlock-anim');
-        btnNext.querySelectorAll('.btn-sparkle').forEach(el => el.remove());
-        document.getElementById('result').classList.remove('active');
-        showScreen('level-select');
-    });
-
-    document.getElementById('hint-dismiss-btn').addEventListener('click', dismissLevelHint);
-
-    document.getElementById('btn-exit-replay').addEventListener('click', exitReplay);
+    EventManager.bindAll();
 
     updateMenuTitle();
 }

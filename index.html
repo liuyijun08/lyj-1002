@@ -32,7 +32,7 @@
         <div id="chef-cards" class="chef-cards"></div>
         <div class="chef-schedule-actions">
             <button id="btn-rest-chef" class="btn btn-success">😴 全员休息</button>
-            <button class="btn btn-secondary" onclick="showScreen('menu')">返回主菜单</button>
+            <button class="btn btn-secondary" data-navigate="menu">返回主菜单</button>
         </div>
     </div>
 
@@ -64,7 +64,7 @@
                 <p>🎯 <strong>目标</strong>：完成关卡菜谱分数目标，解锁下一关</p>
             </div>
         </div>
-        <button class="btn btn-secondary" onclick="showScreen('menu')">返回</button>
+        <button class="btn btn-secondary" data-navigate="menu">返回</button>
     </div>
 
     <div id="achievements" class="screen">
@@ -100,7 +100,7 @@
             <button id="btn-unequip-title" class="btn btn-secondary btn-small" style="display:none;">卸下称号</button>
         </div>
 
-        <button class="btn btn-secondary" onclick="showScreen('menu')">返回主菜单</button>
+        <button class="btn btn-secondary" data-navigate="menu">返回主菜单</button>
     </div>
 
     <div id="inventory" class="screen">
@@ -132,11 +132,11 @@
         <div id="inventory-list" class="inventory-list"></div>
         <div class="inventory-actions">
             <button id="btn-restock-all" class="btn btn-success">🔄 一键补货</button>
-            <button class="btn btn-secondary" onclick="showScreen('menu')">返回主菜单</button>
+            <button class="btn btn-secondary" data-navigate="menu">返回主菜单</button>
         </div>
     </div>
 
-    <div id="restock-dialog" class="screen overlay" style="display:none;">
+    <div id="restock-dialog" class="screen overlay">
         <div class="dialog restock-dialog">
             <div class="restock-header">
                 <div class="restock-icon" id="restock-icon">🥬</div>
@@ -192,7 +192,7 @@
             <button id="btn-review-wall" class="btn btn-secondary">📝 顾客评价墙</button>
         </div>
         <div id="level-list" class="order-list"></div>
-        <button class="btn btn-secondary" onclick="showScreen('menu')">返回主菜单</button>
+        <button class="btn btn-secondary" data-navigate="menu">返回主菜单</button>
     </div>
 
     <div id="review-wall" class="screen">
@@ -226,10 +226,10 @@
             <button class="review-tab" data-filter="complaint">有投诉</button>
         </div>
         <div id="review-list" class="review-list"></div>
-        <button class="btn btn-secondary" onclick="showScreen('level-select')">返回接单中心</button>
+        <button class="btn btn-secondary" data-navigate="level-select">返回接单中心</button>
     </div>
 
-    <div id="order-confirm" class="screen overlay" style="display:none;">
+    <div id="order-confirm" class="screen overlay">
         <div class="dialog order-confirm-dialog">
             <div class="order-confirm-header">
                 <div class="order-confirm-icon">📋</div>
@@ -390,7 +390,7 @@
         </div>
     </div>
 
-    <div id="confirm-overlay" class="screen overlay" style="display:none;">
+    <div id="confirm-overlay" class="screen overlay">
         <div class="dialog confirm-dialog">
             <h2 id="confirm-title">确认操作</h2>
             <p id="confirm-message" class="confirm-message">本局分数和回放记录将会丢失，确定继续吗？</p>
@@ -483,7 +483,7 @@
         </div>
     </div>
 
-    <div id="level-hint-overlay" class="level-hint-overlay" style="display:none;">
+    <div id="level-hint-overlay" class="level-hint-overlay">
         <div class="level-hint-card" id="level-hint-card">
             <div class="level-hint-badge">🎉 新关卡解锁</div>
             <div class="level-hint-num" id="hint-level-num"></div>
