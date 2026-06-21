@@ -1213,7 +1213,10 @@ document.addEventListener('keydown', (e) => {
         }
     }
     if (key === 'escape') {
-        if (game && game.running && !game.paused && !game.replayMode) {
+        const confirmEl = document.getElementById('confirm-overlay');
+        if (confirmEl.style.display !== 'none') {
+            dismissConfirmDialog();
+        } else if (game && game.running && !game.paused && !game.replayMode) {
             pauseGame();
         } else if (game && game.paused) {
             resumeGame();
@@ -1245,7 +1248,32 @@ function quitToLevelSelect() {
     if (game) game.stop();
     game = null;
     document.getElementById('pause').classList.remove('active');
+    document.getElementById('confirm-overlay').style.display = 'none';
     showScreen('level-select');
+}
+
+let _pendingConfirmAction = null;
+
+function showConfirmDialog(title, message, action) {
+    _pendingConfirmAction = action;
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-message').innerHTML = message;
+    document.getElementById('confirm-overlay').style.display = 'flex';
+}
+
+function dismissConfirmDialog() {
+    _pendingConfirmAction = null;
+    document.getElementById('confirm-overlay').style.display = 'none';
+}
+
+function restartLevel() {
+    if (!game) return;
+    const levelId = game.level.id;
+    game.stop();
+    game = null;
+    document.getElementById('pause').classList.remove('active');
+    document.getElementById('confirm-overlay').style.display = 'none';
+    startLevel(levelId);
 }
 
 // ==================== 初始化 ====================
@@ -1290,7 +1318,28 @@ function init() {
     // 暂停菜单
     document.getElementById('btn-pause').addEventListener('click', pauseGame);
     document.getElementById('btn-resume').addEventListener('click', resumeGame);
-    document.getElementById('btn-quit').addEventListener('click', quitToLevelSelect);
+    document.getElementById('btn-quit').addEventListener('click', () => {
+        if (!game) return;
+        const curScore = Math.floor(game.score).toLocaleString();
+        showConfirmDialog(
+            '确认退出？',
+            `当前分数：<strong style="font-size:20px;">${curScore}</strong><br><br>退出关卡后，<strong>本局分数和回放记录将会丢失</strong>，确定退出吗？`,
+            quitToLevelSelect
+        );
+    });
+    document.getElementById('btn-restart').addEventListener('click', () => {
+        if (!game) return;
+        const curScore = Math.floor(game.score).toLocaleString();
+        showConfirmDialog(
+            '确认重新开始？',
+            `当前分数：<strong style="font-size:20px;">${curScore}</strong><br><br>重新开始后，<strong>本局分数和回放记录将会丢失</strong>，确定重来吗？`,
+            restartLevel
+        );
+    });
+    document.getElementById('btn-confirm-ok').addEventListener('click', () => {
+        if (_pendingConfirmAction) _pendingConfirmAction();
+    });
+    document.getElementById('btn-confirm-cancel').addEventListener('click', dismissConfirmDialog);
     document.getElementById('btn-replay-menu').addEventListener('click', () => {
         if (!game) return;
         const levelId = game.level.id;

@@ -175,7 +175,19 @@
             <div class="dialog-buttons">
                 <button id="btn-resume" class="btn btn-primary">继续游戏</button>
                 <button id="btn-replay-menu" class="btn btn-secondary">查看回放</button>
+                <button id="btn-restart" class="btn btn-secondary">再来一次</button>
                 <button id="btn-quit" class="btn btn-danger">退出关卡</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirm-overlay" class="screen overlay" style="display:none;">
+        <div class="dialog confirm-dialog">
+            <h2 id="confirm-title">确认操作</h2>
+            <p id="confirm-message" class="confirm-message">本局分数和回放记录将会丢失，确定继续吗？</p>
+            <div class="dialog-buttons">
+                <button id="btn-confirm-cancel" class="btn btn-secondary">取消</button>
+                <button id="btn-confirm-ok" class="btn btn-danger">确认</button>
             </div>
         </div>
     </div>
