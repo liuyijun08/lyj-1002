@@ -174,8 +174,45 @@
                 </div>
             </div>
         </div>
+        <div class="restaurant-actions">
+            <button id="btn-review-wall" class="btn btn-secondary">📝 顾客评价墙</button>
+        </div>
         <div id="level-list" class="order-list"></div>
         <button class="btn btn-secondary" onclick="showScreen('menu')">返回主菜单</button>
+    </div>
+
+    <div id="review-wall" class="screen">
+        <div class="review-wall-header">
+            <div class="review-wall-logo">📝</div>
+            <h2 class="review-wall-title">顾客评价墙</h2>
+            <div class="review-wall-stats">
+                <div class="rw-stat">
+                    <span class="rw-stat-label">总评价数</span>
+                    <span id="rw-total-count" class="rw-stat-value">0</span>
+                </div>
+                <div class="rw-stat">
+                    <span class="rw-stat-label">好评率</span>
+                    <span id="rw-good-rate" class="rw-stat-value">0%</span>
+                </div>
+                <div class="rw-stat">
+                    <span class="rw-stat-label">累计小费</span>
+                    <span id="rw-total-tips" class="rw-stat-value">¥0</span>
+                </div>
+                <div class="rw-stat">
+                    <span class="rw-stat-label">平均评分</span>
+                    <span id="rw-avg-rating" class="rw-stat-value">⭐0.0</span>
+                </div>
+            </div>
+        </div>
+        <div class="review-tabs">
+            <button class="review-tab active" data-filter="all">全部评价</button>
+            <button class="review-tab" data-filter="good">好评 (4-5星)</button>
+            <button class="review-tab" data-filter="medium">中评 (3星)</button>
+            <button class="review-tab" data-filter="bad">差评 (1-2星)</button>
+            <button class="review-tab" data-filter="complaint">有投诉</button>
+        </div>
+        <div id="review-list" class="review-list"></div>
+        <button class="btn btn-secondary" onclick="showScreen('level-select')">返回接单中心</button>
     </div>
 
     <div id="order-confirm" class="screen overlay" style="display:none;">
@@ -391,6 +428,30 @@
             </div>
             <div id="unlock-msg" class="unlock-msg"></div>
             <div id="verification-msg" class="verification-msg" style="display:none;"></div>
+            <div id="customer-review" class="customer-review" style="display:none;">
+                <div class="customer-review-header">
+                    <span class="cr-icon">👤</span>
+                    <span class="cr-title">顾客评价</span>
+                </div>
+                <div class="customer-review-body">
+                    <div class="cr-rating-row">
+                        <span class="cr-label">评分：</span>
+                        <span id="cr-rating" class="cr-rating">⭐⭐⭐⭐⭐</span>
+                    </div>
+                    <div id="cr-tip-row" class="cr-tip-row">
+                        <span class="cr-label">小费：</span>
+                        <span id="cr-tip" class="cr-tip">+¥0</span>
+                    </div>
+                    <div id="cr-complaint-row" class="cr-complaint-row" style="display:none;">
+                        <span class="cr-label">投诉：</span>
+                        <span id="cr-complaint" class="cr-complaint"></span>
+                    </div>
+                    <div class="cr-comment-row">
+                        <span class="cr-label">评价：</span>
+                        <span id="cr-comment" class="cr-comment"></span>
+                    </div>
+                </div>
+            </div>
             <div class="dialog-buttons">
                 <button id="btn-retry" class="btn btn-primary">🔄 再来一单</button>
                 <button id="btn-watch-replay" class="btn btn-secondary">📼 观看回放</button>

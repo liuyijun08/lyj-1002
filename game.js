@@ -451,11 +451,36 @@ function dismissLevelHint() {
 
 // ==================== 存储系统 ====================
 const SAVE_KEY = 'rhythm-chef-save';
+const REVIEWS_KEY = 'rhythm-chef-reviews';
+
+const TIP_RULES = {
+    star5: 0.20,
+    star4: 0.12,
+    star3: 0.05,
+    star2: 0,
+    star1: 0,
+    star0: 0
+};
+
+const COMPLAINT_REASONS = {
+    timeout: '等太久了，菜都凉了！',
+    dead: '菜做得太差劲了，完全没法吃！',
+    badfood: '食材不新鲜，吃到坏东西了！',
+    lowscore: '味道一般般，不值这个价。'
+};
+
+const REVIEW_COMMENTS = {
+    excellent: ['太好吃了！下次还来！', '厨艺精湛，堪称一绝！', '完美的用餐体验！', '五星好评，强烈推荐！'],
+    good: ['味道不错，值得再来。', '挺满意的，下次还点。', '服务好，菜品棒！', '性价比很高！'],
+    medium: ['一般般吧，还行。', '中规中矩，没什么惊喜。', '凑合能吃。', '普普通通。'],
+    bad: ['不太满意，需要改进。', '味道差了点意思。', '有点失望。', '不会再点了。'],
+    terrible: ['太难吃了！', '简直是灾难！', '再也不来了！', '差评！退款！']
+};
 
 function getSaveData() {
     try {
         const raw = localStorage.getItem(SAVE_KEY);
-        if (!raw) return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [], achievements: {}, equippedTitle: null, totalDodges: 0, maxComboEver: 0, levelBestRanks: {}, levelStars: {}, totalIncome: 0, totalOrders: 0, lastOrderDate: null };
+        if (!raw) return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [], achievements: {}, equippedTitle: null, totalDodges: 0, maxComboEver: 0, levelBestRanks: {}, levelStars: {}, totalIncome: 0, totalOrders: 0, lastOrderDate: null, totalTips: 0 };
         const data = JSON.parse(raw);
         return {
             unlocked: data.unlocked || 1,
@@ -471,11 +496,105 @@ function getSaveData() {
             levelStars: data.levelStars || {},
             totalIncome: data.totalIncome || 0,
             totalOrders: data.totalOrders || 0,
-            lastOrderDate: data.lastOrderDate || null
+            lastOrderDate: data.lastOrderDate || null,
+            totalTips: data.totalTips || 0
         };
     } catch {
-        return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [], achievements: {}, equippedTitle: null, totalDodges: 0, maxComboEver: 0, levelBestRanks: {}, levelStars: {}, totalIncome: 0, totalOrders: 0, lastOrderDate: null };
+        return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [], achievements: {}, equippedTitle: null, totalDodges: 0, maxComboEver: 0, levelBestRanks: {}, levelStars: {}, totalIncome: 0, totalOrders: 0, lastOrderDate: null, totalTips: 0 };
     }
+}
+
+function getReviews() {
+    try {
+        const raw = localStorage.getItem(REVIEWS_KEY);
+        if (!raw) return [];
+        return JSON.parse(raw) || [];
+    } catch {
+        return [];
+    }
+}
+
+function saveReviews(reviews) {
+    try {
+        localStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews));
+    } catch (e) {
+        console.warn('评价保存失败', e);
+    }
+}
+
+function addReview(review) {
+    const reviews = getReviews();
+    reviews.unshift(review);
+    if (reviews.length > 100) {
+        reviews.length = 100;
+    }
+    saveReviews(reviews);
+    return review;
+}
+
+function generateCustomerReview(level, stars, passed, endReason, accuracy, badCuts, finalScore) {
+    let rating = 0;
+    let complaint = null;
+    let tipAmount = 0;
+    let commentCategory = 'medium';
+    let comment = '';
+
+    if (passed) {
+        if (stars >= 3) {
+            rating = 5;
+            commentCategory = 'excellent';
+        } else if (stars === 2) {
+            rating = 4;
+            commentCategory = 'good';
+        } else if (stars === 1) {
+            rating = 3;
+            commentCategory = 'medium';
+        } else {
+            rating = 2;
+            commentCategory = 'bad';
+        }
+        if (rating >= 3) {
+            const tipRate = TIP_RULES['star' + rating] || 0;
+            tipAmount = Math.floor(level.price * tipRate);
+        }
+    } else {
+        rating = 1;
+        if (endReason === 'timeout') {
+            complaint = COMPLAINT_REASONS.timeout;
+        } else if (endReason === 'dead') {
+            complaint = COMPLAINT_REASONS.dead;
+        } else if (endReason === 'badfood') {
+            complaint = COMPLAINT_REASONS.badfood;
+        } else {
+            complaint = COMPLAINT_REASONS.lowscore;
+        }
+        commentCategory = 'terrible';
+    }
+
+    const comments = REVIEW_COMMENTS[commentCategory] || REVIEW_COMMENTS.medium;
+    comment = comments[Math.floor(Math.random() * comments.length)];
+
+    const review = {
+        id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        orderNo: level.orderNo,
+        levelId: level.id,
+        dishName: level.dishName,
+        recipe: level.recipe,
+        customer: level.customer,
+        rating: rating,
+        complaint: complaint,
+        tip: tipAmount,
+        comment: comment,
+        score: finalScore,
+        stars: stars,
+        accuracy: Math.round(accuracy * 10000) / 100,
+        badCuts: badCuts,
+        passed: passed,
+        endReason: endReason,
+        timestamp: Date.now()
+    };
+
+    return review;
 }
 
 function saveData(data) {
@@ -1089,6 +1208,7 @@ function showScreen(id) {
     if (id === 'level-select') renderLevelSelect();
     if (id === 'achievements') renderAchievementsPage();
     if (id === 'inventory') renderInventoryPage();
+    if (id === 'review-wall') renderReviewWall();
     if (id === 'menu') updateMenuTitle();
 }
 
@@ -2253,6 +2373,16 @@ function onLevelComplete(engine) {
         updateLevelStars(level.id, stars);
     }
 
+    let currentReview = null;
+    if (!engine.replayMode) {
+        currentReview = generateCustomerReview(level, stars, passed, endReason, accuracy, badCuts, finalScore);
+        addReview(currentReview);
+        if (currentReview.tip > 0) {
+            save.totalTips = (save.totalTips || 0) + currentReview.tip;
+            save.totalIncome = (save.totalIncome || 0) + currentReview.tip;
+        }
+    }
+
     const prevBest = save.bestScores[level.id] || 0;
     const thisReplay = engine.getReplayData();
     if (!save.lastReplays) save.lastReplays = {};
@@ -2338,7 +2468,147 @@ function onLevelComplete(engine) {
     const btnReplay = document.getElementById('btn-watch-replay');
     btnReplay.style.display = '';
 
+    if (currentReview && !engine.replayMode) {
+        showCustomerReviewOnResult(currentReview);
+    } else {
+        document.getElementById('customer-review').style.display = 'none';
+    }
+
     showScreen('result');
+}
+
+function showCustomerReviewOnResult(review) {
+    const reviewEl = document.getElementById('customer-review');
+    if (!reviewEl) return;
+
+    reviewEl.style.display = 'block';
+
+    const ratingEl = document.getElementById('cr-rating');
+    if (ratingEl) {
+        ratingEl.textContent = '⭐'.repeat(review.rating) + '☆'.repeat(5 - review.rating);
+    }
+
+    const tipRow = document.getElementById('cr-tip-row');
+    const tipEl = document.getElementById('cr-tip');
+    if (tipRow && tipEl) {
+        if (review.tip > 0) {
+            tipRow.style.display = '';
+            tipEl.textContent = '+¥' + review.tip;
+            tipEl.className = 'cr-tip tip-positive';
+        } else {
+            tipRow.style.display = 'none';
+        }
+    }
+
+    const complaintRow = document.getElementById('cr-complaint-row');
+    const complaintEl = document.getElementById('cr-complaint');
+    if (complaintRow && complaintEl) {
+        if (review.complaint) {
+            complaintRow.style.display = '';
+            complaintEl.textContent = review.complaint;
+        } else {
+            complaintRow.style.display = 'none';
+        }
+    }
+
+    const commentEl = document.getElementById('cr-comment');
+    if (commentEl) {
+        commentEl.textContent = review.comment;
+    }
+}
+
+// ==================== 评价墙系统 ====================
+let currentReviewFilter = 'all';
+
+function renderReviewWall() {
+    const reviews = getReviews();
+    const save = getSaveData();
+    const totalCount = reviews.length;
+    const totalTips = save.totalTips || 0;
+
+    let goodCount = 0;
+    let totalRating = 0;
+    let ratedCount = 0;
+    reviews.forEach(r => {
+        if (r.rating >= 4) goodCount++;
+        if (r.rating > 0) {
+            totalRating += r.rating;
+            ratedCount++;
+        }
+    });
+
+    const goodRate = totalCount > 0 ? Math.round((goodCount / totalCount) * 100) : 0;
+    const avgRating = ratedCount > 0 ? (totalRating / ratedCount).toFixed(1) : '0.0';
+
+    document.getElementById('rw-total-count').textContent = totalCount;
+    document.getElementById('rw-good-rate').textContent = goodRate + '%';
+    document.getElementById('rw-total-tips').textContent = '¥' + totalTips.toLocaleString();
+    document.getElementById('rw-avg-rating').textContent = '⭐' + avgRating;
+
+    renderReviewList(reviews);
+}
+
+function renderReviewList(reviews) {
+    const listEl = document.getElementById('review-list');
+    if (!listEl) return;
+
+    let filtered = reviews;
+    if (currentReviewFilter === 'good') {
+        filtered = reviews.filter(r => r.rating >= 4);
+    } else if (currentReviewFilter === 'medium') {
+        filtered = reviews.filter(r => r.rating === 3);
+    } else if (currentReviewFilter === 'bad') {
+        filtered = reviews.filter(r => r.rating <= 2 && r.rating > 0);
+    } else if (currentReviewFilter === 'complaint') {
+        filtered = reviews.filter(r => r.complaint);
+    }
+
+    listEl.innerHTML = '';
+
+    if (filtered.length === 0) {
+        listEl.innerHTML = '<div class="no-reviews">暂无评价数据</div>';
+        return;
+    }
+
+    filtered.forEach(review => {
+        const card = document.createElement('div');
+        card.className = 'review-card rating-' + review.rating;
+
+        const date = new Date(review.timestamp);
+        const dateStr = date.toLocaleDateString('zh-CN') + ' ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+
+        const starsHTML = '⭐'.repeat(review.rating) + '☆'.repeat(5 - review.rating);
+
+        let tipHTML = '';
+        if (review.tip > 0) {
+            tipHTML = `<div class="review-tip">💰 小费: +¥${review.tip}</div>`;
+        }
+
+        let complaintHTML = '';
+        if (review.complaint) {
+            complaintHTML = `<div class="review-complaint">⚠️ 投诉: ${review.complaint}</div>`;
+        }
+
+        card.innerHTML = `
+            <div class="review-header">
+                <div class="review-customer">
+                    <span class="review-avatar">👤</span>
+                    <span class="review-name">${review.customer}</span>
+                </div>
+                <div class="review-rating">${starsHTML}</div>
+            </div>
+            <div class="review-dish">${review.recipe} · ${review.dishName}</div>
+            <div class="review-comment">"${review.comment}"</div>
+            ${tipHTML}
+            ${complaintHTML}
+            <div class="review-footer">
+                <span class="review-order">📋 ${review.orderNo}</span>
+                <span class="review-date">${dateStr}</span>
+            </div>
+        `;
+
+        listEl.appendChild(card);
+    });
 }
 
 // ==================== 回放系统 ====================
@@ -2470,6 +2740,22 @@ function init() {
     });
     document.getElementById('btn-inventory').addEventListener('click', () => {
         showScreen('inventory');
+    });
+
+    const btnReviewWall = document.getElementById('btn-review-wall');
+    if (btnReviewWall) {
+        btnReviewWall.addEventListener('click', () => {
+            showScreen('review-wall');
+        });
+    }
+
+    document.querySelectorAll('.review-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.review-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentReviewFilter = tab.dataset.filter;
+            renderReviewWall();
+        });
     });
 
     document.querySelectorAll('.inv-tab').forEach(tab => {
