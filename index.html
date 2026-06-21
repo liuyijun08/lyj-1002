@@ -89,24 +89,88 @@
     </div>
 
     <div id="level-select" class="screen">
-        <h2>选择关卡</h2>
-        <div id="level-list" class="level-list"></div>
-        <button class="btn btn-secondary" onclick="showScreen('menu')">返回</button>
+        <div class="restaurant-header">
+            <div class="restaurant-logo">🍽️</div>
+            <h2 class="restaurant-title">📋 餐厅接单中心</h2>
+            <div class="restaurant-stats">
+                <div class="rest-stat">
+                    <span class="rest-stat-label">今日接单</span>
+                    <span id="rest-today-orders" class="rest-stat-value">0</span>
+                </div>
+                <div class="rest-stat">
+                    <span class="rest-stat-label">累计收入</span>
+                    <span id="rest-total-income" class="rest-stat-value">¥0</span>
+                </div>
+                <div class="rest-stat">
+                    <span class="rest-stat-label">平均星级</span>
+                    <span id="rest-avg-stars" class="rest-stat-value">⭐0.0</span>
+                </div>
+            </div>
+        </div>
+        <div id="level-list" class="order-list"></div>
+        <button class="btn btn-secondary" onclick="showScreen('menu')">返回主菜单</button>
+    </div>
+
+    <div id="order-confirm" class="screen overlay" style="display:none;">
+        <div class="dialog order-confirm-dialog">
+            <div class="order-confirm-header">
+                <div class="order-confirm-icon">📋</div>
+                <h2>确认接单</h2>
+            </div>
+            <div class="order-confirm-body">
+                <div class="confirm-order-no" id="confirm-order-no"></div>
+                <div class="confirm-dish" id="confirm-dish"></div>
+                <div class="confirm-customer-row">
+                    <span>👤 顾客：</span>
+                    <span id="confirm-customer"></span>
+                </div>
+                <div class="confirm-req-list">
+                    <div class="confirm-req-item">
+                        <span class="req-icon">⏱️</span>
+                        <span class="req-label">限时</span>
+                        <span id="confirm-timelimit" class="req-value"></span>
+                    </div>
+                    <div class="confirm-req-item">
+                        <span class="req-icon">🥀</span>
+                        <span class="req-label">坏食材容错</span>
+                        <span id="confirm-tolerance" class="req-value"></span>
+                    </div>
+                    <div class="confirm-req-item">
+                        <span class="req-icon">🎯</span>
+                        <span class="req-label">目标分数</span>
+                        <span id="confirm-target" class="req-value"></span>
+                    </div>
+                    <div class="confirm-req-item">
+                        <span class="req-icon">💰</span>
+                        <span class="req-label">订单收入</span>
+                        <span id="confirm-price" class="req-value"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="confirm-difficulty-row">
+                <span class="confirm-diff-label">难度：</span>
+                <span id="confirm-difficulty" class="confirm-difficulty"></span>
+            </div>
+            <div class="dialog-buttons">
+                <button id="btn-cancel-order" class="btn btn-secondary">取消</button>
+                <button id="btn-accept-order" class="btn btn-primary">🚀 开始接单</button>
+            </div>
+        </div>
     </div>
 
     <div id="game" class="screen">
         <div class="game-hud">
             <div class="hud-left">
                 <div class="hud-item">
-                    <span class="hud-label">分数</span>
+                    <span class="hud-label">💰 收入</span>
                     <span id="score" class="hud-value">0</span>
                 </div>
                 <div class="hud-item">
-                    <span class="hud-label">连击</span>
+                    <span class="hud-label">🔥 连击</span>
                     <span id="combo" class="hud-value combo-value">0</span>
                 </div>
                 <div class="hud-item">
-                    <span class="hud-label">最大连击</span>
+                    <span class="hud-label">🏆 最大连击</span>
                     <span id="max-combo" class="hud-value">0</span>
                 </div>
             </div>
@@ -115,19 +179,30 @@
                     <span id="level-name" class="hud-level-name"></span>
                 </div>
                 <div class="recipe-goal">
-                    <span class="goal-label">目标</span>
+                    <span class="goal-label">🎯 目标</span>
                     <div class="goal-bar">
                         <div id="goal-progress" class="goal-progress"></div>
                     </div>
                     <span id="goal-text" class="goal-text">0 / 0</span>
                 </div>
+                <div class="timer-container">
+                    <span class="timer-label">⏱️ 剩余</span>
+                    <span id="timer" class="timer-value">00:00</span>
+                </div>
             </div>
             <div class="hud-right">
                 <div class="hp-container">
-                    <span class="hud-label">生命</span>
+                    <span class="hud-label">❤️ 生命</span>
                     <div class="hp-bar">
                         <div id="hp" class="hp-fill"></div>
                     </div>
+                </div>
+                <div class="bad-tolerance-container">
+                    <span class="hud-label">🥀 坏食材</span>
+                    <div class="tolerance-bar">
+                        <div id="bad-tolerance" class="tolerance-fill"></div>
+                    </div>
+                    <span id="bad-tolerance-text" class="tolerance-text">0 / 0</span>
                 </div>
                 <button id="btn-pause" class="btn-icon" title="暂停">⏸</button>
             </div>
@@ -195,39 +270,57 @@
     <div id="result" class="screen overlay">
         <div class="dialog result-dialog">
             <h2 id="result-title">关卡完成！</h2>
+            <div id="result-stars" class="result-stars">⭐⭐⭐</div>
             <div id="result-rank" class="result-rank">S</div>
             <div class="result-stats">
                 <div class="stat-row">
-                    <span class="stat-label">总分</span>
+                    <span class="stat-label">💰 最终收入</span>
                     <span id="result-score" class="stat-value">0</span>
                 </div>
                 <div class="stat-row">
-                    <span class="stat-label">最大连击</span>
+                    <span class="stat-label">⏱️ 用时</span>
+                    <span id="result-timeused" class="stat-value">00:00</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">🔥 最大连击</span>
                     <span id="result-combo" class="stat-value">0</span>
                 </div>
                 <div class="stat-row">
+                    <span class="stat-label">🥀 切到坏食材</span>
+                    <span id="result-badcuts" class="stat-value miss">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">💯 准确率</span>
+                    <span id="result-accuracy" class="stat-value perfect">0%</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">❤️ 剩余生命</span>
+                    <span id="result-hp" class="stat-value good">0</span>
+                </div>
+                <div class="stat-row sub-stat">
                     <span class="stat-label">Perfect</span>
                     <span id="result-perfect" class="stat-value perfect">0</span>
                 </div>
-                <div class="stat-row">
+                <div class="stat-row sub-stat">
                     <span class="stat-label">Great</span>
                     <span id="result-great" class="stat-value great">0</span>
                 </div>
-                <div class="stat-row">
+                <div class="stat-row sub-stat">
                     <span class="stat-label">Good</span>
                     <span id="result-good" class="stat-value good">0</span>
                 </div>
-                <div class="stat-row">
+                <div class="stat-row sub-stat">
                     <span class="stat-label">Miss</span>
                     <span id="result-miss" class="stat-value miss">0</span>
                 </div>
             </div>
             <div id="unlock-msg" class="unlock-msg"></div>
+            <div id="verification-msg" class="verification-msg" style="display:none;"></div>
             <div class="dialog-buttons">
-                <button id="btn-retry" class="btn btn-primary">再来一次</button>
-                <button id="btn-watch-replay" class="btn btn-secondary">观看回放</button>
-                <button id="btn-next-level" class="btn btn-success">下一关</button>
-                <button id="btn-back-levels" class="btn btn-secondary">关卡选择</button>
+                <button id="btn-retry" class="btn btn-primary">🔄 再来一单</button>
+                <button id="btn-watch-replay" class="btn btn-secondary">📼 观看回放</button>
+                <button id="btn-next-level" class="btn btn-success">➡️ 下一个订单</button>
+                <button id="btn-back-levels" class="btn btn-secondary">📋 返回接单</button>
             </div>
         </div>
     </div>

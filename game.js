@@ -148,55 +148,110 @@ const LEVELS = [
         id: 1,
         name: '入门切菜',
         recipe: '🥗 清爽蔬菜沙拉',
+        dishName: '清爽蔬菜沙拉',
+        customer: '健身达人小美',
+        orderNo: 'ORD-001',
+        price: 28,
+        timeLimit: 60000,
+        badFoodTolerance: 3,
         difficulty: 'easy',
         difficultyLabel: '简单',
         targetScore: 15000,
         targetPercent: 0.6,
         noteCount: 40,
+        starCriteria: {
+            star1: { accuracy: 0.5, hp: 20, badCuts: 5 },
+            star2: { accuracy: 0.7, hp: 40, badCuts: 3 },
+            star3: { accuracy: 0.9, hp: 70, badCuts: 1 }
+        },
         data: null
     },
     {
         id: 2,
         name: '家常小炒',
         recipe: '🍳 番茄炒蛋',
+        dishName: '番茄炒蛋',
+        customer: '程序员小李',
+        orderNo: 'ORD-002',
+        price: 32,
+        timeLimit: 75000,
+        badFoodTolerance: 3,
         difficulty: 'normal',
         difficultyLabel: '普通',
         targetScore: 25000,
         targetPercent: 0.65,
         noteCount: 60,
+        starCriteria: {
+            star1: { accuracy: 0.55, hp: 20, badCuts: 5 },
+            star2: { accuracy: 0.72, hp: 45, badCuts: 3 },
+            star3: { accuracy: 0.92, hp: 75, badCuts: 1 }
+        },
         data: null
     },
     {
         id: 3,
         name: '主厨挑战',
         recipe: '🍖 红烧排骨',
+        dishName: '红烧排骨',
+        customer: '美食家老王',
+        orderNo: 'ORD-003',
+        price: 68,
+        timeLimit: 90000,
+        badFoodTolerance: 2,
         difficulty: 'hard',
         difficultyLabel: '困难',
         targetScore: 40000,
         targetPercent: 0.7,
         noteCount: 80,
+        starCriteria: {
+            star1: { accuracy: 0.6, hp: 25, badCuts: 5 },
+            star2: { accuracy: 0.78, hp: 50, badCuts: 2 },
+            star3: { accuracy: 0.95, hp: 80, badCuts: 0 }
+        },
         data: null
     },
     {
         id: 4,
         name: '快速刀工',
         recipe: '🍣 寿司拼盘',
+        dishName: '寿司拼盘',
+        customer: '日料爱好者Tony',
+        orderNo: 'ORD-004',
+        price: 88,
+        timeLimit: 100000,
+        badFoodTolerance: 2,
         difficulty: 'hard',
         difficultyLabel: '困难',
         targetScore: 55000,
         targetPercent: 0.75,
         noteCount: 100,
+        starCriteria: {
+            star1: { accuracy: 0.65, hp: 25, badCuts: 4 },
+            star2: { accuracy: 0.8, hp: 55, badCuts: 2 },
+            star3: { accuracy: 0.95, hp: 85, badCuts: 0 }
+        },
         data: null
     },
     {
         id: 5,
         name: '终极料理',
         recipe: '🍱 怀石料理套餐',
+        dishName: '怀石料理套餐',
+        customer: '米其林评审员',
+        orderNo: 'ORD-005',
+        price: 188,
+        timeLimit: 120000,
+        badFoodTolerance: 1,
         difficulty: 'expert',
         difficultyLabel: '专家',
         targetScore: 80000,
         targetPercent: 0.8,
         noteCount: 140,
+        starCriteria: {
+            star1: { accuracy: 0.7, hp: 30, badCuts: 3 },
+            star2: { accuracy: 0.85, hp: 60, badCuts: 1 },
+            star3: { accuracy: 0.97, hp: 90, badCuts: 0 }
+        },
         data: null
     }
 ];
@@ -361,7 +416,7 @@ const SAVE_KEY = 'rhythm-chef-save';
 function getSaveData() {
     try {
         const raw = localStorage.getItem(SAVE_KEY);
-        if (!raw) return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [], achievements: {}, equippedTitle: null, totalDodges: 0, maxComboEver: 0, levelBestRanks: {} };
+        if (!raw) return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [], achievements: {}, equippedTitle: null, totalDodges: 0, maxComboEver: 0, levelBestRanks: {}, levelStars: {}, totalIncome: 0, totalOrders: 0, lastOrderDate: null };
         const data = JSON.parse(raw);
         return {
             unlocked: data.unlocked || 1,
@@ -373,10 +428,14 @@ function getSaveData() {
             equippedTitle: data.equippedTitle || null,
             totalDodges: data.totalDodges || 0,
             maxComboEver: data.maxComboEver || 0,
-            levelBestRanks: data.levelBestRanks || {}
+            levelBestRanks: data.levelBestRanks || {},
+            levelStars: data.levelStars || {},
+            totalIncome: data.totalIncome || 0,
+            totalOrders: data.totalOrders || 0,
+            lastOrderDate: data.lastOrderDate || null
         };
     } catch {
-        return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [], achievements: {}, equippedTitle: null, totalDodges: 0, maxComboEver: 0, levelBestRanks: {} };
+        return { unlocked: 1, bestScores: {}, replays: {}, lastReplays: {}, seenHints: [], achievements: {}, equippedTitle: null, totalDodges: 0, maxComboEver: 0, levelBestRanks: {}, levelStars: {}, totalIncome: 0, totalOrders: 0, lastOrderDate: null };
     }
 }
 
@@ -691,27 +750,65 @@ function showScreen(id) {
     if (id === 'menu') updateMenuTitle();
 }
 
-// ==================== 关卡选择 ====================
+// ==================== 关卡选择（餐厅订单模式）====================
+let pendingOrderLevelId = null;
+
 function renderLevelSelect() {
     const save = getSaveData();
+    updateRestaurantStats(save);
+
     const list = document.getElementById('level-list');
     list.innerHTML = '';
     LEVELS.forEach(lvl => {
         const unlocked = lvl.id <= save.unlocked;
         const best = save.bestScores[lvl.id] || 0;
+        const stars = save.levelStars[lvl.id] || 0;
         const card = document.createElement('div');
-        card.className = 'level-card' + (unlocked ? '' : ' locked');
+        card.className = 'order-card' + (unlocked ? '' : ' locked');
+
+        const starsHTML = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+        const timeLimitStr = formatTime(lvl.timeLimit);
+
         card.innerHTML = `
-            <div class="level-num">第 ${lvl.id} 关</div>
-            <div class="level-name">${lvl.name}</div>
-            <div class="level-recipe">${lvl.recipe}</div>
-            <div class="level-target">🎯 目标: ${lvl.targetScore.toLocaleString()}</div>
-            <span class="level-diff diff-${lvl.difficulty}">${lvl.difficultyLabel}</span>
-            ${best > 0 ? `<div class="best-score">🏆 ${best.toLocaleString()}</div>` : ''}
-            ${!unlocked ? '<div class="locked-icon">🔒</div>' : ''}
+            <div class="order-card-top">
+                <div class="order-no">📋 ${lvl.orderNo}</div>
+                <span class="level-diff diff-${lvl.difficulty}">${lvl.difficultyLabel}</span>
+            </div>
+            <div class="order-dish">${lvl.recipe}</div>
+            <div class="order-customer">👤 ${lvl.customer}</div>
+            <div class="order-req-grid">
+                <div class="order-req">
+                    <span class="req-icon">⏱️</span>
+                    <span class="req-text">限时 ${timeLimitStr}</span>
+                </div>
+                <div class="order-req">
+                    <span class="req-icon">🥀</span>
+                    <span class="req-text">容错 ${lvl.badFoodTolerance} 次</span>
+                </div>
+                <div class="order-req">
+                    <span class="req-icon">🎯</span>
+                    <span class="req-text">${lvl.targetScore.toLocaleString()}</span>
+                </div>
+                <div class="order-req">
+                    <span class="req-icon">💰</span>
+                    <span class="req-text">¥${lvl.price}</span>
+                </div>
+            </div>
+            <div class="order-stars-row">
+                <span class="order-stars">${starsHTML}</span>
+            </div>
+            ${best > 0 ? `<div class="best-income">💵 最高 ¥${best.toLocaleString()}</div>` : ''}
+            ${!unlocked ? '<div class="locked-icon">🔒</div><div class="order-locked-text">完成上一单解锁</div>' : '<button class="accept-order-btn">🚀 接单</button>'}
         `;
         if (unlocked) {
-            card.addEventListener('click', () => startLevel(lvl.id));
+            const btn = card.querySelector('.accept-order-btn');
+            if (btn) {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showOrderConfirm(lvl.id);
+                });
+            }
+            card.addEventListener('click', () => showOrderConfirm(lvl.id));
         }
         list.appendChild(card);
     });
@@ -721,6 +818,129 @@ function renderLevelSelect() {
             setTimeout(() => showLevelHintCard(i), 300);
             break;
         }
+    }
+}
+
+function updateRestaurantStats(save) {
+    const today = new Date().toDateString();
+    let todayOrders = 0;
+    if (save.lastOrderDate === today) {
+        todayOrders = save._todayOrders || 0;
+    }
+    document.getElementById('rest-today-orders').textContent = todayOrders;
+    document.getElementById('rest-total-income').textContent = '¥' + save.totalIncome.toLocaleString();
+    const totalStars = Object.values(save.levelStars).reduce((a, b) => a + b, 0);
+    const avgStars = Object.keys(save.levelStars).length > 0 ? (totalStars / Object.keys(save.levelStars).length).toFixed(1) : '0.0';
+    document.getElementById('rest-avg-stars').textContent = '⭐' + avgStars;
+}
+
+function formatTime(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+}
+
+function showOrderConfirm(levelId) {
+    const lvl = LEVELS.find(l => l.id === levelId);
+    if (!lvl) return;
+    pendingOrderLevelId = levelId;
+
+    document.getElementById('confirm-order-no').textContent = '📋 订单号：' + lvl.orderNo;
+    document.getElementById('confirm-dish').innerHTML = lvl.recipe + ' · ' + lvl.dishName;
+    document.getElementById('confirm-customer').textContent = lvl.customer;
+    document.getElementById('confirm-timelimit').textContent = formatTime(lvl.timeLimit);
+    document.getElementById('confirm-tolerance').textContent = '最多 ' + lvl.badFoodTolerance + ' 次';
+    document.getElementById('confirm-target').textContent = lvl.targetScore.toLocaleString();
+    document.getElementById('confirm-price').textContent = '¥' + lvl.price;
+    const diffEl = document.getElementById('confirm-difficulty');
+    diffEl.textContent = lvl.difficultyLabel;
+    diffEl.className = 'confirm-difficulty diff-' + lvl.difficulty;
+
+    document.getElementById('order-confirm').style.display = 'flex';
+}
+
+function dismissOrderConfirm() {
+    document.getElementById('order-confirm').style.display = 'none';
+    pendingOrderLevelId = null;
+}
+
+function acceptPendingOrder() {
+    if (pendingOrderLevelId !== null) {
+        const id = pendingOrderLevelId;
+        dismissOrderConfirm();
+        startLevel(id);
+    }
+}
+
+function calcStars(level, accuracy, hp, badCuts) {
+    const c = level.starCriteria;
+    if (accuracy >= c.star3.accuracy && hp >= c.star3.hp && badCuts <= c.star3.badCuts) return 3;
+    if (accuracy >= c.star2.accuracy && hp >= c.star2.hp && badCuts <= c.star2.badCuts) return 2;
+    if (accuracy >= c.star1.accuracy && hp >= c.star1.hp && badCuts <= c.star1.badCuts) return 1;
+    return 0;
+}
+
+function renderStars(stars) {
+    return '<span class="star star-on">⭐</span>'.repeat(stars) +
+           '<span class="star star-off">☆</span>'.repeat(3 - stars);
+}
+
+function generateVerificationToken(levelId, stars, score, timestamp) {
+    const raw = `RC-${levelId}-${stars}-${score}-${timestamp}`;
+    let hash = 0;
+    for (let i = 0; i < raw.length; i++) {
+        hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+        hash |= 0;
+    }
+    return `${raw}-${Math.abs(hash).toString(36).toUpperCase()}`;
+}
+
+function verifyToken(token) {
+    if (!token || typeof token !== 'string') return null;
+    const parts = token.split('-');
+    if (parts.length < 6) return null;
+    const [, levelIdStr, starsStr, scoreStr, timestampStr, checksum] = parts;
+    const levelId = parseInt(levelIdStr, 10);
+    const stars = parseInt(starsStr, 10);
+    const score = parseInt(scoreStr, 10);
+    const timestamp = parseInt(timestampStr, 10);
+    const raw = `RC-${levelId}-${stars}-${score}-${timestamp}`;
+    let hash = 0;
+    for (let i = 0; i < raw.length; i++) {
+        hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+        hash |= 0;
+    }
+    if (Math.abs(hash).toString(36).toUpperCase() !== checksum) return null;
+    return { levelId, stars, score, timestamp, valid: true };
+}
+
+function checkURLVerification() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('verify');
+        if (token) {
+            const result = verifyToken(token);
+            if (result) {
+                const lvl = LEVELS.find(l => l.id === result.levelId);
+                const dish = lvl ? lvl.dishName : '未知菜品';
+                const date = new Date(result.timestamp);
+                const msg = `✅ 浏览器验证通过：[${dish}] ⭐${result.stars}星 / ¥${result.score}`;
+                console.log(msg, result);
+                try {
+                    sessionStorage.setItem('verify_result', JSON.stringify(result));
+                } catch (e) {}
+            }
+        }
+    } catch (e) {}
+}
+
+function updateLevelStars(levelId, stars) {
+    const save = getSaveData();
+    const prev = save.levelStars[levelId] || 0;
+    if (stars > prev) {
+        save.levelStars[levelId] = stars;
+        saveData(save);
     }
 }
 
@@ -755,11 +975,17 @@ class GameEngine {
         this.keydownReplayFrames = [];
 
         this.dodgeCount = 0;
+        this.badCutsCount = 0;
         this.newlyUnlockedAchievements = [];
 
         this.timelineDuration = 0;
         this.timelineSeekable = false;
         this.isDraggingTimeline = false;
+
+        this.timeRemaining = 0;
+        this.timeLimit = 0;
+        this.badFoodTolerance = 0;
+        this.levelEndReason = null;
     }
 
     start(levelId, replayData = null) {
@@ -782,12 +1008,18 @@ class GameEngine {
         this.hp = MAX_HP;
         this.judges = { perfect: 0, great: 0, good: 0, miss: 0, bad: 0 };
         this.dodgeCount = 0;
+        this.badCutsCount = 0;
         this.newlyUnlockedAchievements = [];
         this.replay = replayData;
         this.currentReplayIndex = 0;
         this.replayActions = replayData ? (replayData.actions || []) : [];
         this.recordedActions = [];
         this.recordedHits = [];
+
+        this.timeLimit = this.level.timeLimit;
+        this.timeRemaining = this.timeLimit;
+        this.badFoodTolerance = this.level.badFoodTolerance;
+        this.levelEndReason = null;
 
         this.clearVisuals();
         this.updateHUD();
@@ -850,6 +1082,37 @@ class GameEngine {
         if (maxComboEl) maxComboEl.textContent = this.maxCombo;
         this.updateHP();
         this.updateGoal();
+        if (this.prefix === '') {
+            this.updateTimer();
+            this.updateBadTolerance();
+        }
+    }
+
+    updateTimer() {
+        const timerEl = document.getElementById('timer');
+        if (!timerEl) return;
+        const remaining = Math.max(0, this.timeRemaining);
+        const totalSec = Math.ceil(remaining / 1000);
+        const min = Math.floor(totalSec / 60);
+        const sec = totalSec % 60;
+        timerEl.textContent = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+        timerEl.classList.remove('timer-warn', 'timer-danger');
+        const ratio = remaining / this.timeLimit;
+        if (ratio <= 0.2) timerEl.classList.add('timer-danger');
+        else if (ratio <= 0.4) timerEl.classList.add('timer-warn');
+    }
+
+    updateBadTolerance() {
+        const fillEl = document.getElementById('bad-tolerance');
+        const textEl = document.getElementById('bad-tolerance-text');
+        if (!fillEl || !textEl) return;
+        const used = Math.min(this.badCutsCount, this.badFoodTolerance);
+        const percent = this.badFoodTolerance > 0 ? (used / this.badFoodTolerance) * 100 : 0;
+        fillEl.style.width = percent + '%';
+        fillEl.classList.remove('tolerance-warn', 'tolerance-danger');
+        if (used >= this.badFoodTolerance) fillEl.classList.add('tolerance-danger');
+        else if (used >= Math.max(0, this.badFoodTolerance - 1)) fillEl.classList.add('tolerance-warn');
+        textEl.textContent = `${used} / ${this.badFoodTolerance}`;
     }
 
     updateHP() {
@@ -886,7 +1149,17 @@ class GameEngine {
         const now = this.getCurrentTime();
         const frameTime = performance.now();
 
-        // 回放模式：处理输入模拟
+        if (!this.replayMode) {
+            this.timeRemaining = this.timeLimit - now;
+            if (this.timeRemaining <= 0) {
+                this.timeRemaining = 0;
+                this.running = false;
+                this.levelEndReason = 'timeout';
+                setTimeout(() => onLevelComplete(this), 500);
+                return;
+            }
+        }
+
         if (this.replayMode && this.replayActions) {
             while (this.currentReplayIndex < this.replayActions.length &&
                    this.replayActions[this.currentReplayIndex].time <= now) {
@@ -906,9 +1179,9 @@ class GameEngine {
             this.updateTimelinePlayhead(now);
         }
 
-        // 检查关卡结束
         if (this.allNotesPassed(now) && this.activeNotes.length === 0) {
             this.running = false;
+            this.levelEndReason = 'complete';
             if (this.replayMode) {
                 this.updateTimelinePlayhead(this.timelineDuration);
             } else {
@@ -917,9 +1190,16 @@ class GameEngine {
             return;
         }
 
-        // 检查血量
         if (!this.replayMode && this.hp <= 0) {
             this.running = false;
+            this.levelEndReason = 'dead';
+            setTimeout(() => onLevelComplete(this), 500);
+            return;
+        }
+
+        if (!this.replayMode && this.badCutsCount > this.badFoodTolerance) {
+            this.running = false;
+            this.levelEndReason = 'badfood';
             setTimeout(() => onLevelComplete(this), 500);
             return;
         }
@@ -1112,9 +1392,9 @@ class GameEngine {
                 this.showJudge('MISS', 'miss');
                 break;
             case 'bad-cut':
-                // 切到坏食材：扣分+断连+掉血
                 this.combo = 0;
                 this.judges.bad++;
+                this.badCutsCount++;
                 this.score = Math.max(0, this.score - 800);
                 this.hp -= HP_DAMAGE_BAD;
                 this.showJudge('BAD CUT!', 'bad');
@@ -1555,20 +1835,30 @@ function startLevel(levelId) {
 function onLevelComplete(engine) {
     const level = engine.level;
     const finalScore = Math.floor(engine.score);
-    const passed = finalScore >= level.targetScore && engine.hp > 0;
     const judges = engine.judges;
+    const badCuts = engine.badCutsCount;
+    const endReason = engine.levelEndReason;
+    const timeUsed = engine.getCurrentTime();
 
-    // 评级
     const totalGood = judges.perfect + judges.great + judges.good + judges.miss;
     const accuracy = totalGood > 0 ? (judges.perfect * 1 + judges.great * 0.8 + judges.good * 0.5) / totalGood : 0;
+    const hpRemaining = Math.max(0, Math.round(engine.hp));
+
     let rank = 'F';
-    if (accuracy >= 0.95 && engine.hp > 50) rank = 'S';
+    if (accuracy >= 0.95 && hpRemaining > 50) rank = 'S';
     else if (accuracy >= 0.85) rank = 'A';
     else if (accuracy >= 0.7) rank = 'B';
     else if (accuracy >= 0.5) rank = 'C';
     else rank = 'F';
 
-    // 成就检测（必须先执行，会修改保存数据）
+    const starsPass = (endReason === 'complete' || (endReason !== 'timeout' && endReason !== 'badfood' && endReason !== 'dead'));
+    let passed = false;
+    let stars = 0;
+    if (starsPass && engine.hp > 0 && endReason !== 'timeout') {
+        passed = finalScore >= level.targetScore;
+        stars = passed ? calcStars(level, accuracy, hpRemaining, badCuts) : 0;
+    }
+
     if (!engine.replayMode) {
         updateMaxCombo(engine.maxCombo);
         updateLevelBestRank(level.id, rank, accuracy, engine.hp);
@@ -1578,17 +1868,28 @@ function onLevelComplete(engine) {
         dodgeUnlocked.forEach(ach => showAchievementPopup(ach));
     }
 
-    // 成就检测完成后再读取最新的 save 数据，避免覆盖成就
     const save = getSaveData();
 
-    // 更新记录
     let newUnlock = false;
     if (passed) {
         if (level.id >= save.unlocked && level.id < LEVELS.length) {
             save.unlocked = level.id + 1;
             newUnlock = true;
         }
+        const today = new Date().toDateString();
+        if (save.lastOrderDate !== today) {
+            save.lastOrderDate = today;
+            save._todayOrders = 0;
+        }
+        save._todayOrders = (save._todayOrders || 0) + 1;
+        save.totalOrders = (save.totalOrders || 0) + 1;
+        save.totalIncome = (save.totalIncome || 0) + finalScore;
     }
+
+    if (passed) {
+        updateLevelStars(level.id, stars);
+    }
+
     const prevBest = save.bestScores[level.id] || 0;
     const thisReplay = engine.getReplayData();
     if (!save.lastReplays) save.lastReplays = {};
@@ -1599,8 +1900,18 @@ function onLevelComplete(engine) {
     }
     saveData(save);
 
-    // 显示结果
-    document.getElementById('result-title').textContent = passed ? '🎉 关卡完成！' : (engine.hp <= 0 ? '💀 生命值耗尽...' : '😅 未达目标...');
+    const starsEl = document.getElementById('result-stars');
+    starsEl.innerHTML = renderStars(stars);
+
+    let titleMsg = '';
+    switch (endReason) {
+        case 'timeout': titleMsg = '⏰ 时间耗尽，订单超时！'; break;
+        case 'dead': titleMsg = '💀 生命值耗尽，订单失败！'; break;
+        case 'badfood': titleMsg = `🥀 切到坏食材超过容错 (${badCuts}/${level.badFoodTolerance})！`; break;
+        default: titleMsg = passed ? `🎉 订单完成！${stars > 0 ? ' 获得' + stars + '⭐' : ''}` : (rank === 'F' ? '� 未达目标分数...' : '🎉 演奏结束！目标未达成'); break;
+    }
+    document.getElementById('result-title').textContent = titleMsg;
+
     const rankEl = document.getElementById('result-rank');
     rankEl.textContent = rank;
     rankEl.className = 'result-rank rank-' + rank.toLowerCase();
@@ -1611,6 +1922,28 @@ function onLevelComplete(engine) {
     document.getElementById('result-great').textContent = judges.great;
     document.getElementById('result-good').textContent = judges.good;
     document.getElementById('result-miss').textContent = judges.miss + judges.bad;
+    document.getElementById('result-timeused').textContent = formatTime(timeUsed);
+    document.getElementById('result-badcuts').textContent = badCuts;
+    document.getElementById('result-accuracy').textContent = Math.round(accuracy * 10000) / 100 + '%';
+    document.getElementById('result-hp').textContent = hpRemaining;
+
+    const verifyEl = document.getElementById('verification-msg');
+    if (passed && stars > 0) {
+        const timestamp = Date.now();
+        const token = generateVerificationToken(level.id, stars, finalScore, timestamp);
+        const verifyURL = window.location.origin + window.location.pathname + '?verify=' + encodeURIComponent(token);
+        verifyEl.style.display = 'block';
+        verifyEl.innerHTML = `
+            <div class="verify-box">
+                <div class="verify-title">🔐 通关验证凭证</div>
+                <div class="verify-token" onclick="navigator.clipboard && navigator.clipboard.writeText(this.textContent);this.classList.add('copied');" title="点击复制">${token}</div>
+                <div class="verify-hint">点击凭证复制，或<a href="${verifyURL}" target="_blank" class="verify-link">🔗 分享验证链接</a></div>
+            </div>
+        `;
+    } else {
+        verifyEl.style.display = 'none';
+        verifyEl.innerHTML = '';
+    }
 
     const unlockMsg = document.getElementById('unlock-msg');
     const btnNext = document.getElementById('btn-next-level');
@@ -1618,7 +1951,7 @@ function onLevelComplete(engine) {
     btnNext.querySelectorAll('.btn-sparkle').forEach(el => el.remove());
     if (newUnlock) {
         const nextLvl = LEVELS.find(l => l.id === level.id + 1);
-        unlockMsg.textContent = `🎊 解锁新关卡：第${nextLvl.id}关 ${nextLvl.name}`;
+        unlockMsg.textContent = `🎊 解锁新订单：${nextLvl.orderNo} · ${nextLvl.dishName}`;
         unlockMsg.style.display = 'block';
     } else {
         unlockMsg.style.display = 'none';
@@ -1761,7 +2094,8 @@ function init() {
         _levelDataLoaded = true;
     }
 
-    // 菜单按钮
+    checkURLVerification();
+
     document.getElementById('btn-start').addEventListener('click', () => {
         showScreen('level-select');
     });
@@ -1772,7 +2106,9 @@ function init() {
         showScreen('achievements');
     });
 
-    // 成就分类标签
+    document.getElementById('btn-cancel-order').addEventListener('click', dismissOrderConfirm);
+    document.getElementById('btn-accept-order').addEventListener('click', acceptPendingOrder);
+
     document.querySelectorAll('.ach-tab').forEach(tab => {
         tab.addEventListener('click', () => {
             document.querySelectorAll('.ach-tab').forEach(t => t.classList.remove('active'));
@@ -1782,7 +2118,6 @@ function init() {
         });
     });
 
-    // 卸下称号按钮
     const unequipBtn = document.getElementById('btn-unequip-title');
     if (unequipBtn) {
         unequipBtn.addEventListener('click', () => {
@@ -1793,7 +2128,6 @@ function init() {
         });
     }
 
-    // 暂停菜单
     document.getElementById('btn-pause').addEventListener('click', pauseGame);
     document.getElementById('btn-resume').addEventListener('click', resumeGame);
     document.getElementById('btn-quit').addEventListener('click', () => {
@@ -1801,7 +2135,7 @@ function init() {
         const curScore = Math.floor(game.score).toLocaleString();
         showConfirmDialog(
             '确认退出？',
-            `当前分数：<strong style="font-size:20px;">${curScore}</strong><br><br>退出关卡后，<strong>本局未完成的分数和临时记录将会丢失</strong><br><span style="color:#888;font-size:14px;">（已保存的历史回放不会受影响）</span><br><br>确定退出吗？`,
+            `当前收入：<strong style="font-size:20px;">¥${curScore}</strong><br><br>退出订单后，<strong>本局未完成的收入和临时记录将会丢失</strong><br><span style="color:#888;font-size:14px;">（已保存的历史回放不会受影响）</span><br><br>确定取消这单吗？`,
             quitToLevelSelect
         );
     });
@@ -1810,7 +2144,7 @@ function init() {
         const curScore = Math.floor(game.score).toLocaleString();
         showConfirmDialog(
             '确认重新开始？',
-            `当前分数：<strong style="font-size:20px;">${curScore}</strong><br><br>重新开始后，<strong>本局未完成的分数和临时记录将会丢失</strong><br><span style="color:#888;font-size:14px;">（已保存的历史回放不会受影响）</span><br><br>确定重来吗？`,
+            `当前收入：<strong style="font-size:20px;">¥${curScore}</strong><br><br>重新接单后，<strong>本局未完成的收入和临时记录将会丢失</strong><br><span style="color:#888;font-size:14px;">（已保存的历史回放不会受影响）</span><br><br>确定重来吗？`,
             restartLevel
         );
     });
@@ -1826,7 +2160,6 @@ function init() {
         watchReplay(levelId);
     });
 
-    // 结果页按钮
     document.getElementById('btn-retry').addEventListener('click', () => {
         dismissLevelHint();
         const btnNext = document.getElementById('btn-next-level');
@@ -1869,10 +2202,8 @@ function init() {
 
     document.getElementById('hint-dismiss-btn').addEventListener('click', dismissLevelHint);
 
-    // 回放退出
     document.getElementById('btn-exit-replay').addEventListener('click', exitReplay);
 
-    // 初始更新菜单称号
     updateMenuTitle();
 }
 
