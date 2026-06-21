@@ -1323,7 +1323,7 @@ function init() {
         const curScore = Math.floor(game.score).toLocaleString();
         showConfirmDialog(
             '确认退出？',
-            `当前分数：<strong style="font-size:20px;">${curScore}</strong><br><br>退出关卡后，<strong>本局分数和回放记录将会丢失</strong>，确定退出吗？`,
+            `当前分数：<strong style="font-size:20px;">${curScore}</strong><br><br>退出关卡后，<strong>本局未完成的分数和临时记录将会丢失</strong><br><span style="color:#888;font-size:14px;">（已保存的历史回放不会受影响）</span><br><br>确定退出吗？`,
             quitToLevelSelect
         );
     });
@@ -1332,7 +1332,7 @@ function init() {
         const curScore = Math.floor(game.score).toLocaleString();
         showConfirmDialog(
             '确认重新开始？',
-            `当前分数：<strong style="font-size:20px;">${curScore}</strong><br><br>重新开始后，<strong>本局分数和回放记录将会丢失</strong>，确定重来吗？`,
+            `当前分数：<strong style="font-size:20px;">${curScore}</strong><br><br>重新开始后，<strong>本局未完成的分数和临时记录将会丢失</strong><br><span style="color:#888;font-size:14px;">（已保存的历史回放不会受影响）</span><br><br>确定重来吗？`,
             restartLevel
         );
     });
