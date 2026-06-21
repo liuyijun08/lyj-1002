@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>节奏切菜大师 - Rhythm Chef</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+    <div id="menu" class="screen active">
+        <h1 class="title">🔪 节奏切菜大师 🔪</h1>
+        <p class="subtitle">跟随节拍，切出完美菜品！</p>
+        <div class="menu-buttons">
+            <button id="btn-start" class="btn btn-primary">开始游戏</button>
+            <button id="btn-howto" class="btn btn-secondary">操作说明</button>
+        </div>
+    </div>
+
+    <div id="howto" class="screen">
+        <h2>操作说明</h2>
+        <div class="howto-content">
+            <div class="howto-item">
+                <div class="key-hint">D</div>
+                <div class="howto-text">切左轨道食材</div>
+            </div>
+            <div class="howto-item">
+                <div class="key-hint">F</div>
+                <div class="howto-text">切中左轨道食材</div>
+            </div>
+            <div class="howto-item">
+                <div class="key-hint">J</div>
+                <div class="howto-text">切中右轨道食材</div>
+            </div>
+            <div class="howto-item">
+                <div class="key-hint">K</div>
+                <div class="howto-text">切右轨道食材</div>
+            </div>
+            <div class="howto-tips">
+                <p>🥬 <strong>好食材</strong>：蔬菜、肉类，按键正确得分</p>
+                <p>💀 <strong>坏食材</strong>：发霉、腐烂，<strong>不要按</strong>！让它自动通过</p>
+                <p>⭐ <strong>判定</strong>：Perfect / Great / Good / Miss</p>
+                <p>🔥 <strong>连击</strong>：连续命中获得加成分数</p>
+                <p>❌ <strong>失误</strong>：按错或漏按扣血，切到坏食材扣分更多</p>
+                <p>🎯 <strong>目标</strong>：完成关卡菜谱分数目标，解锁下一关</p>
+            </div>
+        </div>
+        <button class="btn btn-secondary" onclick="showScreen('menu')">返回</button>
+    </div>
+
+    <div id="level-select" class="screen">
+        <h2>选择关卡</h2>
+        <div id="level-list" class="level-list"></div>
+        <button class="btn btn-secondary" onclick="showScreen('menu')">返回</button>
+    </div>
+
+    <div id="game" class="screen">
+        <div class="game-hud">
+            <div class="hud-left">
+                <div class="hud-item">
+                    <span class="hud-label">分数</span>
+                    <span id="score" class="hud-value">0</span>
+                </div>
+                <div class="hud-item">
+                    <span class="hud-label">连击</span>
+                    <span id="combo" class="hud-value combo-value">0</span>
+                </div>
+                <div class="hud-item">
+                    <span class="hud-label">最大连击</span>
+                    <span id="max-combo" class="hud-value">0</span>
+                </div>
+            </div>
+            <div class="hud-center">
+                <div class="hud-item level-info">
+                    <span id="level-name" class="hud-level-name"></span>
+                </div>
+                <div class="recipe-goal">
+                    <span class="goal-label">目标</span>
+                    <div class="goal-bar">
+                        <div id="goal-progress" class="goal-progress"></div>
+                    </div>
+                    <span id="goal-text" class="goal-text">0 / 0</span>
+                </div>
+            </div>
+            <div class="hud-right">
+                <div class="hp-container">
+                    <span class="hud-label">生命</span>
+                    <div class="hp-bar">
+                        <div id="hp" class="hp-fill"></div>
+                    </div>
+                </div>
+                <button id="btn-pause" class="btn-icon" title="暂停">⏸</button>
+            </div>
+        </div>
+
+        <div id="stage" class="stage">
+            <div id="lanes" class="lanes">
+                <div class="lane" data-lane="0">
+                    <div class="lane-bg"></div>
+                    <div class="lane-glow"></div>
+                    <div class="judge-line"></div>
+                    <div class="note-container"></div>
+                    <div class="key-label">D</div>
+                </div>
+                <div class="lane" data-lane="1">
+                    <div class="lane-bg"></div>
+                    <div class="lane-glow"></div>
+                    <div class="judge-line"></div>
+                    <div class="note-container"></div>
+                    <div class="key-label">F</div>
+                </div>
+                <div class="lane" data-lane="2">
+                    <div class="lane-bg"></div>
+                    <div class="lane-glow"></div>
+                    <div class="judge-line"></div>
+                    <div class="note-container"></div>
+                    <div class="key-label">J</div>
+                </div>
+                <div class="lane" data-lane="3">
+                    <div class="lane-bg"></div>
+                    <div class="lane-glow"></div>
+                    <div class="judge-line"></div>
+                    <div class="note-container"></div>
+                    <div class="key-label">K</div>
+                </div>
+            </div>
+            <div id="fx-layer" class="fx-layer"></div>
+            <div id="judge-text" class="judge-text"></div>
+        </div>
+    </div>
+
+    <div id="pause" class="screen overlay">
+        <div class="dialog">
+            <h2>游戏暂停</h2>
+            <div class="dialog-buttons">
+                <button id="btn-resume" class="btn btn-primary">继续游戏</button>
+                <button id="btn-replay-menu" class="btn btn-secondary">查看回放</button>
+                <button id="btn-quit" class="btn btn-danger">退出关卡</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="result" class="screen overlay">
+        <div class="dialog result-dialog">
+            <h2 id="result-title">关卡完成！</h2>
+            <div id="result-rank" class="result-rank">S</div>
+            <div class="result-stats">
+                <div class="stat-row">
+                    <span class="stat-label">总分</span>
+                    <span id="result-score" class="stat-value">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">最大连击</span>
+                    <span id="result-combo" class="stat-value">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Perfect</span>
+                    <span id="result-perfect" class="stat-value perfect">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Great</span>
+                    <span id="result-great" class="stat-value great">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Good</span>
+                    <span id="result-good" class="stat-value good">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Miss</span>
+                    <span id="result-miss" class="stat-value miss">0</span>
+                </div>
+            </div>
+            <div id="unlock-msg" class="unlock-msg"></div>
+            <div class="dialog-buttons">
+                <button id="btn-retry" class="btn btn-primary">再来一次</button>
+                <button id="btn-watch-replay" class="btn btn-secondary">观看回放</button>
+                <button id="btn-next-level" class="btn btn-success">下一关</button>
+                <button id="btn-back-levels" class="btn btn-secondary">关卡选择</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="replay-watching" class="screen overlay hidden-overlay">
+        <div class="replay-header">
+            <h2>📼 回放中...</h2>
+            <button id="btn-exit-replay" class="btn btn-danger">退出回放</button>
+        </div>
+        <div class="game-hud replay-hud">
+            <div class="hud-left">
+                <div class="hud-item">
+                    <span class="hud-label">分数</span>
+                    <span id="replay-score" class="hud-value">0</span>
+                </div>
+                <div class="hud-item">
+                    <span class="hud-label">连击</span>
+                    <span id="replay-combo" class="hud-value combo-value">0</span>
+                </div>
+            </div>
+            <div class="hud-center">
+                <div class="hud-item level-info">
+                    <span id="replay-level-name" class="hud-level-name"></span>
+                </div>
+            </div>
+        </div>
+        <div id="replay-stage" class="stage replay-stage">
+            <div id="replay-lanes" class="lanes">
+                <div class="lane" data-lane="0">
+                    <div class="lane-bg"></div>
+                    <div class="lane-glow"></div>
+                    <div class="judge-line"></div>
+                    <div class="note-container"></div>
+                    <div class="key-label">D</div>
+                </div>
+                <div class="lane" data-lane="1">
+                    <div class="lane-bg"></div>
+                    <div class="lane-glow"></div>
+                    <div class="judge-line"></div>
+                    <div class="note-container"></div>
+                    <div class="key-label">F</div>
+                </div>
+                <div class="lane" data-lane="2">
+                    <div class="lane-bg"></div>
+                    <div class="lane-glow"></div>
+                    <div class="judge-line"></div>
+                    <div class="note-container"></div>
+                    <div class="key-label">J</div>
+                </div>
+                <div class="lane" data-lane="3">
+                    <div class="lane-bg"></div>
+                    <div class="lane-glow"></div>
+                    <div class="judge-line"></div>
+                    <div class="note-container"></div>
+                    <div class="key-label">K</div>
+                </div>
+            </div>
+            <div id="replay-fx-layer" class="fx-layer"></div>
+            <div id="replay-judge-text" class="judge-text"></div>
+        </div>
+    </div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
